@@ -45,6 +45,7 @@ function Machine(code, sandbox) {
 Machine.prototype.start = function () {
   vm.runInContext(this.transformedCode, this.context);
   vm.runInContext('runner.init(top());', this.context);
+  return this;
 };
 
 Machine.prototype.step = function () {

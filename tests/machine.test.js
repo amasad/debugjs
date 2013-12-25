@@ -147,4 +147,58 @@ describe('Machine#run', function () {
     machine.run();
   });
 
+  it('should deeply nested function calls', function (done) {
+    var source = fnString(function () {
+      function foo0() {
+        report('foo0');
+      }
+
+      function foo1() {
+        report('foo1');
+        foo2();
+        foo0();
+      }
+      function foo2() {
+        report('foo2');
+        foo3()
+      }
+      function foo3() {
+        report('foo3');
+      }
+      foo1();
+      report('done');
+    });
+
+    var i = 0;
+    var machine = new Machine(source, {
+      report: function (arg) {
+        var expected;
+        switch (i) {
+          case 0:
+            expected = 'foo1';
+            break;
+          case 1:
+            expected = 'foo2';
+            break;
+          case 2:
+            expected = 'foo3';
+            break;
+          case 3:
+            expected = 'foo0';
+            break;
+          case 4:
+            expected = 'done';
+            break;
+        }
+        assert.equal(arg, expected);
+        i++;
+        if (i > 4) {
+          done();
+        }
+      }
+    });
+
+    machine.start().run();
+  });
+
 });
