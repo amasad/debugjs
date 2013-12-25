@@ -3,6 +3,9 @@ var recast = require('recast');
 var assert = require('assert');
 var esprimaHarmony = require("esprima");
 var _pp = require('jsonpretty');
+var utils = require('./utils');
+
+var fnString = utils.fnString;
 var pp = function (json) {
   console.log(_pp(json));
 };
@@ -50,15 +53,6 @@ function assertEqualsAST(actual, expected) {
     assertEqualNodes(n, path[i]);
     i++;
   });
-}
-
-function fnString(fn) {
-  return fn
-    .toString()
-    .split('\n')
-    .slice(1, -1)
-    .map(function (s) { return s.replace(/^\s+/, ''); })
-    .join('\n');
 }
 
 describe('non functions', function () {

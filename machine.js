@@ -21,6 +21,11 @@ Runner.prototype.step = function () {
       this.stack.push(this.gen);
       this.gen = res;
     }
+  } else if (this.state.done) {
+    if (this.stack.length) {
+      this.gen = this.stack.pop();
+      this.state.done = false;
+    }
   }
 };
 

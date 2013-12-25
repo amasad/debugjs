@@ -1,5 +1,8 @@
 var Machine = require('../machine');
 var assert = require('assert');
+var utils = require('./utils');
+
+var fnString = utils.fnString;
 
 describe('Machine#start', function () {
 
@@ -89,6 +92,49 @@ describe('Machine#step', function () {
     machine.start();
     machine.step();
     machine.step();
+  });
+
+  it('should handle call stack', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        bar(0);
+      }
+      foo();
+      bar(1);
+    });
+
+    var i = 0;
+    var machine = new Machine(source, {
+      bar: function (arg) {
+        assert.equal(arg, i);
+        if (i === 1) {
+          done();
+        }
+        i++;
+      }
+    });
+
+    machine.start();
+    // function foo()
+    machine.step();
+    // foo()
+    machine.step();
+    // call foo
+    machine.step();
+    // bar(0)
+    machine.step();
+    // call bar 0
+    machine.step();
+    // end foo
+    machine.step();
+    // bar(1)
+    machine.step();
+    // call bar 1
+    machine.step();
+    // end
+    machine.step();
+
+    assert(machine.runner.state.done);
   });
 
   // it('should run in sandbox', function (done) {
