@@ -433,4 +433,149 @@ describe('functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
+  it('should thunkify and yield nested function calls', function () {
+    var source = parse(
+      fnString(function () {
+        function bar() {
+          function baz() {
+            foo();
+          }
+          foo();
+        }
+        function foo() {
+          bar();
+        }
+        foo();
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 6,
+                "column": 1
+              }
+            };
+
+            function* bar() {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 4,
+                    "column": 1
+                  }
+                };
+
+                function* baz() {
+                  {
+                    yield {
+                      "start": {
+                        "line": 3,
+                        "column": 0
+                      },
+
+                      "end": {
+                        "line": 3,
+                        "column": 6
+                      }
+                    };
+
+                    yield function thunk() {
+                      return foo();
+                    };
+                  }
+                }
+              }
+
+              {
+                yield {
+                  "start": {
+                    "line": 5,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 5,
+                    "column": 6
+                  }
+                };
+
+                yield function thunk() {
+                  return foo();
+                };
+              }
+            }
+          }
+
+          {
+            yield {
+              "start": {
+                "line": 7,
+                "column": 0
+              },
+
+              "end": {
+                "line": 9,
+                "column": 1
+              }
+            };
+
+            function* foo() {
+              {
+                yield {
+                  "start": {
+                    "line": 8,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 8,
+                    "column": 6
+                  }
+                };
+
+                yield function thunk() {
+                  return bar();
+                };
+              }
+            }
+          }
+
+          {
+            yield {
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+
+              "end": {
+                "line": 10,
+                "column": 6
+              }
+            };
+
+            yield function thunk() {
+              return foo();
+            };
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
 });
