@@ -1,0 +1,266 @@
+var transform = require('../index');
+var recast = require('recast');
+var assert = require('assert');
+var esprimaHarmony = require("esprima");
+var _pp = require('jsonpretty');
+var pp = function (json) {
+  console.log(_pp(json));
+};
+
+function assertMsgFn(condition, msgFn) {
+  if (!condition) {
+    assert(false, msgFn());
+  }
+}
+
+function assertEqualNodes(actual, expected) {
+  for (var prop in actual) {
+    if (typeof actual[prop] !== 'object') {
+      assertMsgFn(
+        expected,
+        function () {
+          return 'Expected node but found none corresponding to actual: ' +
+                  recast.print(actual).code;
+        }
+      );
+      assertMsgFn(
+        actual[prop] === expected[prop],
+        function () {
+          return actual.type + ' ' + prop + ': ' + actual[prop] + ' != ' +
+                  expected[prop] + '\n' +
+                  'Actual node: ' + recast.print(actual).code + '\n' +
+                  'Expected node: ' + recast.print(expected).code;
+        }
+      );
+    }
+  }
+}
+
+function assertEqualsAST(actual, expected) {
+  var path = [];
+  recast.types.traverse(expected, function (n) {
+    path.push(n);
+  });
+  var i = 0;
+  recast.types.traverse(actual, function (n) {
+    assertEqualNodes(n, path[i]);
+    i++;
+  });
+}
+
+function fnString(fn) {
+  return fn
+    .toString()
+    .split('\n')
+    .slice(1, -1)
+    .map(function (s) { return s.replace(/^\s+/, ''); })
+    .join('\n');
+}
+
+describe('works on flat code', function () {
+
+  it('should convert toplevel program into a toplevel generator', function () {
+    var code = 'console.log(1);';
+    var ast = transform(recast.parse(code));
+    assert(ast.program.body[0].generator);
+  });
+
+  it('should yield before Statements', function () {
+    var source = recast.parse(
+      fnString(function () {
+        console.log(1);
+        2;
+        var x = 1;
+        if (x) {
+          x = 2;
+        }
+        switch (x) {
+          case 5:
+            x;
+            break;
+        }
+        while (x) {
+          true;
+          continue;
+        }
+      })
+    );
+
+    var expected = recast.parse(
+      fnString(function () {
+        function *top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 15
+              }
+            };
+            console.log(1);
+          }
+          {
+            yield {
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 2
+              }
+            };
+            2;
+          }
+          {
+            yield {
+              "start": {
+                "line": 3,
+                "column": 0
+              },
+              "end": {
+                "line": 3,
+                "column": 10
+              }
+            };
+            var x = 1;
+          }
+          {
+            yield {
+              "start": {
+                "line": 4,
+                "column": 0
+              },
+              "end": {
+                "line": 6,
+                "column": 1
+              }
+            };
+            if (x) {
+              {
+                yield {
+                  "start": {
+                    "line": 5,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 5,
+                    "column": 6
+                  }
+                };
+                x = 2;
+              }
+            }
+          }
+          {
+            yield {
+              "start": {
+                "line": 7,
+                "column": 0
+              },
+
+              "end": {
+                "line": 11,
+                "column": 1
+              }
+            };
+
+            switch (x) {
+            case 5:
+              {
+                yield {
+                  "start": {
+                    "line": 9,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 9,
+                    "column": 2
+                  }
+                };
+
+                x;
+              }
+
+              {
+                yield {
+                  "start": {
+                    "line": 10,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 10,
+                    "column": 6
+                  }
+                };
+
+                break;
+              }
+            }
+          }
+          {
+            yield {
+              "start": {
+                "line": 12,
+                "column": 0
+              },
+
+              "end": {
+                "line": 15,
+                "column": 1
+              }
+            };
+
+            while (x) {
+              {
+                yield {
+                  "start": {
+                    "line": 13,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 13,
+                    "column": 5
+                  }
+                };
+
+                true;
+                {
+                  yield {
+                    "start": {
+                      "line": 14,
+                      "column": 0
+                    },
+
+                    "end": {
+                      "line": 14,
+                      "column": 9
+                    }
+                  };
+
+                  continue;
+                }
+              }
+            }
+          }
+        }
+      }),
+      {esprima: esprimaHarmony}
+    );
+
+    var transformed = transform(source);
+    var ast = recast.parse(
+      recast.print(transformed).code,
+      {esprima: esprimaHarmony}
+    );
+
+    assertEqualsAST(ast, expected);
+  });
+});
+
