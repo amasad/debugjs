@@ -147,7 +147,7 @@ describe('Machine#run', function () {
     machine.run();
   });
 
-  it('should deeply nested function calls', function (done) {
+  it('should nested function calls', function (done) {
     var source = fnString(function () {
       function foo0() {
         report('foo0');
@@ -193,6 +193,52 @@ describe('Machine#run', function () {
         assert.equal(arg, expected);
         i++;
         if (i > 4) {
+          done();
+        }
+      }
+    });
+
+    machine.start().run();
+  });
+
+  it('should nested function delcerations and calls', function (done) {
+    var source = fnString(function () {
+      function foo1() {
+        function foo2() {
+          function foo3() {
+            report(3);
+          }
+          report(2);
+          foo3();
+        }
+        report(1);
+        foo2();
+      }
+      foo1();
+      report('done');
+    });
+
+    var i = 0;
+    var machine = new Machine(source, {
+      report: function (arg) {
+        var expected;
+        switch (i) {
+          case 0:
+            expected = 1;
+            break;
+          case 1:
+            expected = 2;
+            break;
+          case 2:
+            expected = 3;
+            break;
+          case 3:
+            expected = 'done';
+            break;
+        }
+        assert.equal(arg, expected);
+        i++;
+        if (i > 3) {
           done();
         }
       }
