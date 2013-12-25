@@ -36,6 +36,10 @@ function assertEqualNodes(actual, expected) {
   }
 }
 
+function parse(code) {
+  return recast.parse(code, {esprima: esprimaHarmony});
+}
+
 function assertEqualsAST(actual, expected) {
   var path = [];
   recast.types.traverse(expected, function (n) {
@@ -57,7 +61,7 @@ function fnString(fn) {
     .join('\n');
 }
 
-describe('works on flat code', function () {
+describe('non functions', function () {
 
   it('should convert toplevel program into a toplevel generator', function () {
     var code = 'console.log(1);';
@@ -86,7 +90,7 @@ describe('works on flat code', function () {
       })
     );
 
-    var expected = recast.parse(
+    var expected = parse(
       fnString(function () {
         function *top() {
           {
@@ -250,17 +254,20 @@ describe('works on flat code', function () {
             }
           }
         }
-      }),
-      {esprima: esprimaHarmony}
+      })
     );
 
     var transformed = transform(source);
-    var ast = recast.parse(
+    var ast = parse(
       recast.print(transformed).code,
       {esprima: esprimaHarmony}
     );
 
     assertEqualsAST(ast, expected);
   });
+
 });
 
+describe('functions', function () {
+  
+});
