@@ -141,7 +141,7 @@ describe('Machine#step', function () {
 
 describe('Machine#run', function () {
 
-  it('should step to completion', function () {
+  it('should run to completion', function () {
     var machine = new Machine('1;\n2;\n3;');
     machine.start();
     machine.run();
