@@ -104,7 +104,9 @@ describe('non functions', function () {
                 "column": 15
               }
             };
-            console.log(1);
+            yield function thunk() {
+              return console.log(1);
+            };
           }
           {
             yield {
@@ -257,17 +259,178 @@ describe('non functions', function () {
       })
     );
 
-    var transformed = transform(source);
-    var ast = parse(
-      recast.print(transformed).code,
-      {esprima: esprimaHarmony}
-    );
-
-    assertEqualsAST(ast, expected);
+    assertEqualsAST(transform(source), expected);
   });
 
 });
 
 describe('functions', function () {
-  
+  it('should convert function declerations to generators', function () {
+    var source = parse(
+      fnString(function () {
+        function foo() {
+          1;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            function *foo() {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
+  it('should convert function expressions to generators', function () {
+    var source = parse(
+      fnString(function () {
+        var foo = function () {
+          1;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            var foo = function* () {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
+  it('should thunkify and yield function calls', function () {
+    var source = parse(
+      fnString(function () {
+        function foo() {
+          1;
+        }
+        foo();
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function*top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            function *foo() {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+          {
+            yield {
+              "start": {
+                "line": 4,
+                "column": 0
+              },
+
+              "end": {
+                "line": 4,
+                "column": 6
+              }
+            };
+
+            yield function thunk() {
+              return foo();
+            };
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
 });

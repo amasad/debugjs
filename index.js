@@ -7,6 +7,10 @@ function transform(ast) {
   var program = ast.program;
   var i = 0;
   recast.types.traverse(program.body, function (n) {
+    if (types.Function.check(n)) {
+      n.generator = true;
+    }
+
     if (types.Statement.check(n) &&
         // Block statements are just groupings of other statements so we ignore
         !types.BlockStatement.check(n)) {
@@ -53,6 +57,17 @@ function transform(ast) {
         n
       ]);
       this.replace(replacement);
+    } else if (types.CallExpression.check(n)) {
+      var thunk = b.functionExpression(
+        b.identifier('thunk'),
+        [],
+        b.blockStatement([
+          b.returnStatement(n)
+        ])
+      );
+      this.replace(
+        b.yieldExpression(thunk, false)
+      );
     }
   });
 
