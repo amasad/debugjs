@@ -83,7 +83,7 @@ describe('Machine#step', function () {
     assert.equal(i, 4);
   });
 
-  it('should step through functions', function (done) {
+  it('should step through functions in sandbox', function (done) {
     var machine = new Machine('foo()', {
       foo: function () {
         done();
@@ -136,25 +136,6 @@ describe('Machine#step', function () {
 
     assert(machine.runner.state.done);
   });
-
-  // it('should run in sandbox', function (done) {
-  //   var i = 0;
-  //   var machine = new Machine('testOuts("foo");', {
-  //     testOut: function (arg) {
-  //       console.log(arg)
-  //       if (i == 0) {
-  //         assert.equal(arg === 'foo');
-  //       } else {
-  //         assert.eqaul(arg === 1);
-  //         done();
-  //       }
-  //       i++;
-  //     }
-  //   });
-  //   machine.start();
-  //   machine.step();
-  //   machine.step();
-  // });
 
 });
 
