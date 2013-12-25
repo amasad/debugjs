@@ -125,8 +125,6 @@ describe('Machine#step', function () {
     machine.step();
     // call bar 0
     machine.step();
-    // end foo
-    machine.step();
     // bar(1)
     machine.step();
     // call bar 1
@@ -147,7 +145,7 @@ describe('Machine#run', function () {
     machine.run();
   });
 
-  it('should nested function calls', function (done) {
+  it('should nested function calls wat', function (done) {
     var source = fnString(function () {
       function foo0() {
         report('foo0');
@@ -247,4 +245,35 @@ describe('Machine#run', function () {
     machine.start().run();
   });
 
+  it('should run recursive fib', function (done) {
+    var source = fnString(function () {
+      function fib(n) {
+        if (n == 0 || n == 1) {
+          return n;
+        } else {
+          var res1 = fib(n - 1);
+          var res2 = fib(n - 2);
+          return res1 + res2;
+        }
+      }
+      var res = fib(1);
+      report(res);
+      res = fib(10);
+      report(res);
+    });
+
+    var i = 0;
+    var machine = new Machine(source, {
+      report: function (arg) {
+        if (i == 0) {
+          assert.equal(arg, 1);
+          i++;
+        } else {
+          assert.equal(arg, 55);
+          done();
+        }
+      }
+    });
+    machine.start().run();
+  });
 });
