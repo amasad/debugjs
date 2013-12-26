@@ -125,10 +125,6 @@ describe('Machine#step', function () {
     machine.step();
     // call bar 0
     machine.step();
-    // bar(1)
-    machine.step();
-    // call bar 1
-    machine.step();
     // end
     machine.step();
 
