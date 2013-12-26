@@ -371,4 +371,27 @@ describe('Machine#run', function () {
     machine.start().run();
   });
 
+  it('should handle first order functions wat', function (done) {
+    var source = fnString(function () {
+      function f(fn) {
+        return function () {
+          return fn()
+        }
+      }
+      report(
+        f(function () {
+          return 42;
+        })()
+      );
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+          assert.equal(arg, 42);
+          done();
+        }
+    });
+    machine.start().run();
+  });
+
 });
