@@ -13,16 +13,35 @@ Runner.prototype.init = function (gen) {
   };
 };
 
+Runner.prototype.handleThunk = function (thunk) {
+  var genThunk;
+  while(typeof thunk === 'function') {
+    genThunk = thunk();
+    var state = genThunk.next();
+    if (!state.done) {
+      this.stack.push(genThunk);
+    }
+    thunk = state.value;
+  }
+  return thunk;
+};
+
+
 Runner.prototype.step = function (val) {
   this.state = this.gen.next(val);
+
   if (typeof this.state.value === 'function') {
 
-    // This is a thunk evaluate it and if the result is a generator then we
-    // have to push it on the call stack.
-    var res = this.state.value();
+    // This is a thunk, we push current generator to the stack and recursively
+    // evaluate (and push pending generators from the thunk in the call stack).
+    this.stack.push(this.gen);
+    var res = this.handleThunk(this.state.value);
     if (res && res.toString() === '[object Generator]') {
-      this.stack.push(this.gen);
+      // The result is a generator function call.
       this.gen = res;
+    } else if (this.stack.length) {
+      // The result is avalue.
+      this.gen = this.stack.pop();
     }
   } else if (this.state.done) {
 
@@ -32,7 +51,6 @@ Runner.prototype.step = function (val) {
     if (this.stack.length) {
       this.gen = this.stack.pop();
       this.step(this.state.value);
-      this.state.done = false;
     }
   }
 };

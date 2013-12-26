@@ -98,7 +98,7 @@ describe('non functions', function () {
                 "column": 15
               }
             };
-            yield function thunk() {
+            yield function *thunk() {
               return console.log(1);
             };
           }
@@ -359,7 +359,7 @@ describe('functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should thunkify and yield function calls', function () {
+  it('should *thunkify and yield function calls', function () {
     var source = parse(
       fnString(function () {
         function foo() {
@@ -416,7 +416,7 @@ describe('functions', function () {
               }
             };
 
-            yield function thunk() {
+            yield function *thunk() {
               return foo();
             };
           }
@@ -427,7 +427,7 @@ describe('functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should thunkify and yield nested function calls', function () {
+  it('should *thunkify and yield nested function calls', function () {
     var source = parse(
       fnString(function () {
         function bar() {
@@ -487,7 +487,7 @@ describe('functions', function () {
                       }
                     };
 
-                    yield function thunk() {
+                    yield function *thunk() {
                       return foo();
                     };
                   }
@@ -507,7 +507,7 @@ describe('functions', function () {
                   }
                 };
 
-                yield function thunk() {
+                yield function *thunk() {
                   return foo();
                 };
               }
@@ -541,7 +541,7 @@ describe('functions', function () {
                   }
                 };
 
-                yield function thunk() {
+                yield function *thunk() {
                   return bar();
                 };
               }
@@ -561,7 +561,7 @@ describe('functions', function () {
               }
             };
 
-            yield function thunk() {
+            yield function *thunk() {
               return foo();
             };
           }

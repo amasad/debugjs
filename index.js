@@ -61,7 +61,8 @@ function transform(ast) {
         [],
         b.blockStatement([
           b.returnStatement(n)
-        ])
+        ]),
+        true
       );
       this.replace(
         b.yieldExpression(thunk, false)
