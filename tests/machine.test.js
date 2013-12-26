@@ -145,7 +145,7 @@ describe('Machine#run', function () {
     machine.run();
   });
 
-  it('should nested function calls wat', function (done) {
+  it('should nested function calls', function (done) {
     var source = fnString(function () {
       function foo0() {
         report('foo0');
@@ -276,4 +276,22 @@ describe('Machine#run', function () {
     });
     machine.start().run();
   });
+
+  it('should run handle calls in expressions wat', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        return 1;
+      }
+      report(foo());
+    })
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+        assert.equal(arg, 1);
+        done();
+      }
+    });
+    machine.start().run();
+  });
+
 });
