@@ -307,8 +307,27 @@ describe('Machine#run', function () {
 
     var machine = new Machine(source, {
       report: function (arg) {
-        console.log(arg)
           assert.equal(arg, -1);
+          done();
+        }
+    });
+    machine.start().run();
+  });
+
+  it('should run handle multiple calls in expressions wat', function (done) {
+    var source = fnString(function () {
+      function foo(x) {
+        return 6 / x;
+      }
+      function bar() {
+        return 2;
+      }
+      report(foo(bar()));
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+          assert.equal(arg, 3);
           done();
         }
     });

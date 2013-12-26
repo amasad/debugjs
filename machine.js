@@ -44,11 +44,10 @@ Runner.prototype.step = function (val) {
       this.gen = this.stack.pop();
     }
   } else if (this.state.done) {
-
-    // We are done, but are we really? we could have other generators (calls)
-    // in the call stack. pop them off and run the result through the step to
-    // send it back to the yeilder.
-    if (this.stack.length) {
+    if (this.state.value && this.state.value.toString() === '[object Generator]') {
+      this.gen = this.state.value;
+      this.state.done = false;
+    } else if (this.stack.length) {
       this.gen = this.stack.pop();
       this.step(this.state.value);
     }
@@ -60,7 +59,6 @@ function Machine(code, sandbox) {
   this.ast = recast.parse(code);
   this.transformed = transform(this.ast);
   this.transformedCode = recast.print(this.transformed).code;
-  console.log(this.transformedCode)
   this.console = console;
   this.runner = new Runner();
   sandbox = sandbox || {};
