@@ -60,6 +60,7 @@ function Machine(code, sandbox) {
   this.ast = recast.parse(code);
   this.transformed = transform(this.ast);
   this.transformedCode = recast.print(this.transformed).code;
+  console.log(this.transformedCode)
   this.console = console;
   this.runner = new Runner();
   sandbox = sandbox || {};

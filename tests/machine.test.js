@@ -199,7 +199,7 @@ describe('Machine#run', function () {
     machine.start().run();
   });
 
-  it('should nested function delcerations and calls wat', function (done) {
+  it('should nested function delcerations and calls', function (done) {
     var source = fnString(function () {
       function foo1() {
         function foo2() {
@@ -290,6 +290,27 @@ describe('Machine#run', function () {
         assert.equal(arg, 1);
         done();
       }
+    });
+    machine.start().run();
+  });
+
+  it('should run handle multiple calls in expressions', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        return 1;
+      }
+      function bar() {
+        return 2;
+      }
+      report(foo() - bar());
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+        console.log(arg)
+          assert.equal(arg, -1);
+          done();
+        }
     });
     machine.start().run();
   });
