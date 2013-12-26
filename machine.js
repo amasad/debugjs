@@ -2,6 +2,14 @@ var recast = require('recast');
 var transform = require('./index');
 var vm = require('vm');
 
+function Thunk(fn) {
+  this.invoke = fn;
+}
+
+function createThunk(fn) {
+  return new Thunk(fn);
+}
+
 function Runner() {}
 
 Runner.prototype.init = function (gen) {
@@ -16,10 +24,9 @@ Runner.prototype.init = function (gen) {
 Runner.prototype.step = function (val) {
   this.state = this.gen.next(val);
   // TODO add thunk type.
-  if (typeof this.state.value === 'function' &&
-      this.state.value.name === 'thunk') {
+  if (this.state.value && this.state.value instanceof Thunk) {
     this.stack.push(this.gen);
-    this.gen = this.state.value();
+    this.gen = this.state.value.invoke();
     this.step();
   } else if (this.state.done) {
     if (this.state.value &&
@@ -42,7 +49,8 @@ function Machine(code, sandbox) {
   this.console = console;
   this.runner = new Runner();
   sandbox = sandbox || {};
-  sandbox.runner = this.runner;
+  sandbox.__runner = this.runner;
+  sandbox.__thunk = createThunk;
   sandbox.console = this.console;
   this.context = vm.createContext(sandbox);
 }
@@ -50,12 +58,12 @@ function Machine(code, sandbox) {
 
 Machine.prototype.start = function () {
   vm.runInContext(this.transformedCode, this.context);
-  vm.runInContext('runner.init(top());', this.context);
+  vm.runInContext('__runner.init(top());', this.context);
   return this;
 };
 
 Machine.prototype.step = function () {
-  vm.runInContext('runner.step()', this.context);
+  vm.runInContext('__runner.step()', this.context);
   return this.runner.state;
 };
 

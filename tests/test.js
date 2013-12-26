@@ -98,9 +98,9 @@ describe('non functions', function () {
                 "column": 15
               }
             };
-            yield function *thunk() {
+            yield __thunk(function *thunk() {
               return console.log(1);
-            };
+            });
           }
           {
             yield {
@@ -416,9 +416,9 @@ describe('functions', function () {
               }
             };
 
-            yield function *thunk() {
+            yield __thunk(function *thunk() {
               return foo();
-            };
+            });
           }
         }
       })
@@ -487,9 +487,9 @@ describe('functions', function () {
                       }
                     };
 
-                    yield function *thunk() {
+                    yield __thunk(function *thunk() {
                       return foo();
-                    };
+                    });
                   }
                 }
               }
@@ -507,9 +507,9 @@ describe('functions', function () {
                   }
                 };
 
-                yield function *thunk() {
+                yield __thunk(function *thunk() {
                   return foo();
-                };
+                });
               }
             }
           }
@@ -541,9 +541,9 @@ describe('functions', function () {
                   }
                 };
 
-                yield function *thunk() {
+                yield __thunk(function *thunk() {
                   return bar();
-                };
+                });
               }
             }
           }
@@ -561,9 +561,9 @@ describe('functions', function () {
               }
             };
 
-            yield function *thunk() {
+            yield __thunk(function *thunk() {
               return foo();
-            };
+            });
           }
         }
       })

@@ -56,14 +56,20 @@ function transform(ast) {
       ]);
       this.replace(replacement);
     } else if (types.CallExpression.check(n)) {
-      var thunk = b.functionExpression(
-        b.identifier('thunk'),
-        [],
-        b.blockStatement([
-          b.returnStatement(n)
-        ]),
-        true
+      var thunk = b.callExpression(
+        b.identifier('__thunk'),
+        [
+          b.functionExpression(
+            b.identifier('thunk'),
+            [],
+            b.blockStatement([
+              b.returnStatement(n)
+            ]),
+            true
+          )
+        ]
       );
+
       this.replace(
         b.yieldExpression(thunk, false)
       );

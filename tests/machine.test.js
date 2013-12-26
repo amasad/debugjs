@@ -375,8 +375,8 @@ describe('Machine#run', function () {
     var source = fnString(function () {
       function f(fn) {
         return function () {
-          return fn()
-        }
+          return fn();
+        };
       }
       report(
         f(function () {
