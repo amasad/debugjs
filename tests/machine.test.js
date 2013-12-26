@@ -331,7 +331,7 @@ describe('Machine#run', function () {
   });
 
 
-  it('should run handle multiple calls in expressions wat', function (done) {
+  it('should run handle multiple calls in expressions', function (done) {
     var source = fnString(function () {
       function foo(x) {
         return 6 / x;
@@ -345,6 +345,26 @@ describe('Machine#run', function () {
     var machine = new Machine(source, {
       report: function (arg) {
           assert.equal(arg, -1.5);
+          done();
+        }
+    });
+    machine.start().run();
+  });
+
+
+  it('should handle first order functions wat', function (done) {
+    var source = fnString(function () {
+      function fn1() {
+        return function () {
+          return 1;
+        };
+      }
+      report(fn1()());
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+          assert.equal(arg, 1);
           done();
         }
     });

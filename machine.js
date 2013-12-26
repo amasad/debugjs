@@ -15,8 +15,9 @@ Runner.prototype.init = function (gen) {
 
 Runner.prototype.step = function (val) {
   this.state = this.gen.next(val);
-
-  if (typeof this.state.value === 'function') {
+  // TODO add thunk type.
+  if (typeof this.state.value === 'function' &&
+      this.state.value.name === 'thunk') {
     this.stack.push(this.gen);
     this.gen = this.state.value();
     this.step();
@@ -37,6 +38,7 @@ function Machine(code, sandbox) {
   this.ast = recast.parse(code);
   this.transformed = transform(this.ast);
   this.transformedCode = recast.print(this.transformed).code;
+  // console.log(this.transformedCode)
   this.console = console;
   this.runner = new Runner();
   sandbox = sandbox || {};
