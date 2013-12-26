@@ -1,11 +1,9 @@
-var fs = require('fs');
 var recast = require('recast');
 var b = recast.types.builders;
 var types = recast.types.namedTypes;
 
 function transform(ast) {
   var program = ast.program;
-  var i = 0;
   recast.types.traverse(program.body, function (n) {
     if (types.Function.check(n)) {
       n.generator = true;
