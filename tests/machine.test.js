@@ -352,7 +352,7 @@ describe('Machine#run', function () {
   });
 
 
-  it('should handle first order functions wat', function (done) {
+  it('should handle first order functions', function (done) {
     var source = fnString(function () {
       function fn1() {
         return function () {
@@ -371,7 +371,7 @@ describe('Machine#run', function () {
     machine.start().run();
   });
 
-  it('should handle first order functions wat', function (done) {
+  it('should handle first order functions', function (done) {
     var source = fnString(function () {
       function f(fn) {
         return function () {
@@ -394,4 +394,69 @@ describe('Machine#run', function () {
     machine.start().run();
   });
 
+  it('should respect context', function (done) {
+    var source = fnString(function () {
+      var foo = {
+        p: 1,
+        f: function () { return this.p; }
+      };
+      report(foo.f());
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+        assert.equal(arg, 1);
+        done();
+      }
+    });
+    machine.start().run()
+  });
+
+  it('should respect context in thunks', function (done) {
+    var source = fnString(function () {
+      var foo = {
+        p: 1,
+        f: function () { return report(this === foo); }
+      };
+      foo.f();
+    });
+
+    var machine = new Machine(source, {
+      report: function (arg) {
+        assert(arg);
+        done();
+      }
+    });
+    machine.start().run();
+  });
+
+  // it('should handle iterators', function (done) {
+  //   var source = fnString(function () {
+  //     [1, 2, 3].forEach(function (n, i) {
+  //       report(n, i);
+  //     });
+  //   });
+
+  //   var i = 0;
+  //   var machine = new Machine(source, {
+  //     report: function (arg, index) {
+  //       console.log(arg)
+  //       assert.equal(index, i);
+  //       switch (i) {
+  //         case 0:
+  //           assert.equal(arg, 1);
+  //           break;
+  //         case 1:
+  //           assert.equal(arg, 2);
+  //           break;
+  //         case 3:
+  //           assert.equal(arg, 3);
+  //           done();
+  //           break;
+  //       }
+  //     }
+  //   });
+
+  //   machine.start().run();
+  // });
 });

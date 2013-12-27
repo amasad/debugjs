@@ -2,12 +2,17 @@ var recast = require('recast');
 var transform = require('./index');
 var vm = require('vm');
 
-function Thunk(fn) {
-  this.invoke = fn;
+function Thunk(fn, thisp) {
+  this.fn = fn;
+  this.thisp = thisp;
 }
 
-function createThunk(fn) {
-  return new Thunk(fn);
+Thunk.prototype.invoke = function () {
+  return this.fn.call(this.thisp);
+};
+
+function createThunk(fn, thisp) {
+  return new Thunk(fn, thisp);
 }
 
 function Runner() {}
@@ -42,10 +47,6 @@ Runner.prototype.step = function (val) {
 
 function Machine(code, sandbox) {
   this.code = code;
-  this.ast = recast.parse(code);
-  this.transformed = transform(this.ast);
-  this.transformedCode = recast.print(this.transformed).code;
-  // console.log(this.transformedCode)
   this.console = console;
   this.runner = new Runner();
   sandbox = sandbox || {};
@@ -53,8 +54,19 @@ function Machine(code, sandbox) {
   sandbox.__thunk = createThunk;
   sandbox.console = this.console;
   this.context = vm.createContext(sandbox);
+  // this.transformedCode = this.$transform(require('fs').readFileSync('runtime/es5.js').toString());
+  // this.start().run();
+  // console.log('done runtime')
+  this.transformedCode = this.$transform(code);
 }
 
+Machine.prototype.$transform = function (code) {
+  var ast = recast.parse(code);
+  var transformed = transform(ast);
+  var transformedCode = recast.print(transformed).code;
+  // console.log(transformedCode);
+  return transformedCode;
+};
 
 Machine.prototype.start = function () {
   vm.runInContext(this.transformedCode, this.context);
