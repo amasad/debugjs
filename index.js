@@ -72,7 +72,8 @@ function transform(ast) {
               b.returnStatement(n)
             ]),
             true
-          )
+          ),
+          b.thisExpression()
         ]
       );
 

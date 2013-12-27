@@ -100,7 +100,7 @@ describe('non functions', function () {
             };
             yield __thunk(function *thunk() {
               return console.log(1);
-            });
+            }, this);
           }
           {
             yield {
@@ -381,9 +381,9 @@ describe('non functions', function () {
 
             for (var i = yield __thunk(function* thunk() {
               return foo();
-            }), b = yield __thunk(function* thunk() {
+            }, this), b = yield __thunk(function* thunk() {
               return bar();
-            }); i < 50; i++) {
+            }, this); i < 50; i++) {
               {
                 yield {
                   "start": {
@@ -569,7 +569,7 @@ describe('functions', function () {
 
             yield __thunk(function *thunk() {
               return foo();
-            });
+            }, this);
           }
         }
       })
@@ -640,7 +640,7 @@ describe('functions', function () {
 
                     yield __thunk(function *thunk() {
                       return foo();
-                    });
+                    }, this);
                   }
                 }
               }
@@ -660,7 +660,7 @@ describe('functions', function () {
 
                 yield __thunk(function *thunk() {
                   return foo();
-                });
+                }, this);
               }
             }
           }
@@ -694,7 +694,7 @@ describe('functions', function () {
 
                 yield __thunk(function *thunk() {
                   return bar();
-                });
+                }, this);
               }
             }
           }
@@ -714,7 +714,7 @@ describe('functions', function () {
 
             yield __thunk(function *thunk() {
               return foo();
-            });
+            }, this);
           }
         }
       })
