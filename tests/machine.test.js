@@ -1,4 +1,4 @@
-var Machine = require('../machine');
+var Machine = require('../lib/machine');
 var assert = require('assert');
 var utils = require('./utils');
 

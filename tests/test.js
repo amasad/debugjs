@@ -1,4 +1,4 @@
-var transform = require('../index');
+var transform = require('../lib/transform');
 var recast = require('recast');
 var assert = require('assert');
 var esprimaHarmony = require("esprima");
