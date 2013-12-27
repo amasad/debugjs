@@ -13,8 +13,11 @@ function transform(ast) {
 
     if (types.Statement.check(n) &&
         // Block statements are just groupings of other statements so we ignore
-        !types.BlockStatement.check(n)
-        && !types.ForStatement.check(parent)) {
+        !types.BlockStatement.check(n) &&
+        // Don't insert yield statements inside loop clauses.
+        !types.ForStatement.check(parent) &&
+        !types.ForInStatement.check(parent)) {
+
       var replacement = b.blockStatement([
         b.expressionStatement(
           b.yieldExpression(

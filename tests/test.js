@@ -256,7 +256,7 @@ describe('non functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should do right by loops', function () {
+  it('should do right by for loops', function () {
     var source = parse(
       fnString(function () {
         for (var i = 0; i < 50; i++) {
@@ -282,6 +282,55 @@ describe('non functions', function () {
             };
 
             for (var i = 0; i < 50; i++) {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+        }
+      })
+    );
+    assertEqualsAST(transform(source), expected);
+  });
+
+  it('should do right by for in loops', function () {
+    var source = parse(
+      fnString(function () {
+        for (var p in o) {
+          1;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            for (var p in o) {
               {
                 yield {
                   "start": {
