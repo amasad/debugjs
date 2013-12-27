@@ -256,6 +256,108 @@ describe('non functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
+  it('should do right by loops', function () {
+    var source = parse(
+      fnString(function () {
+        for (var i = 0; i < 50; i++) {
+          1;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            for (var i = 0; i < 50; i++) {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+        }
+      })
+    );
+    assertEqualsAST(transform(source), expected);
+  });
+
+  it('should do right by loops with complex expressions', function () {
+    var source = parse(
+      fnString(function () {
+        for (var i = foo(), b = bar(); i < 50; i++) {
+          1;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 3,
+                "column": 1
+              }
+            };
+
+            for (var i = yield __thunk(function* thunk() {
+              return foo();
+            }), b = yield __thunk(function* thunk() {
+              return bar();
+            }); i < 50; i++) {
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 2
+                  }
+                };
+
+                1;
+              }
+            }
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
 });
 
 describe('functions', function () {

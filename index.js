@@ -9,9 +9,12 @@ function transform(ast) {
       n.generator = true;
     }
 
+    var parent = this.parent && this.parent.node;
+
     if (types.Statement.check(n) &&
         // Block statements are just groupings of other statements so we ignore
-        !types.BlockStatement.check(n)) {
+        !types.BlockStatement.check(n)
+        && !types.ForStatement.check(parent)) {
       var replacement = b.blockStatement([
         b.expressionStatement(
           b.yieldExpression(
