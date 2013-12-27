@@ -54,9 +54,8 @@ function Machine(code, sandbox) {
   sandbox.__thunk = createThunk;
   sandbox.console = this.console;
   this.context = vm.createContext(sandbox);
-  // this.transformedCode = this.$transform(require('fs').readFileSync('runtime/es5.js').toString());
-  // this.start().run();
-  // console.log('done runtime')
+  this.transformedCode = require('fs').readFileSync('runtime/es5.compiled.js').toString();
+  this.start().run();
   this.transformedCode = this.$transform(code);
 }
 
