@@ -4,11 +4,11 @@ var utils = require('./utils');
 
 var fnString = utils.fnString;
 
-describe('Machine#start', function () {
+describe('Machine#evaluate', function () {
 
-  it('should start the machine', function () {
-    var machine = new Machine('1;\n2;');
-    machine.start();
+  it('should evaluate but not run the top-level function', function () {
+    var machine = new Machine();
+    machine.evaluate('1;\n2;');
     assert.deepEqual(machine.runner.state, {
       value: null,
       done: false
@@ -20,8 +20,8 @@ describe('Machine#start', function () {
 describe('Machine#step', function () {
 
   it('should do a single step', function () {
-    var machine = new Machine('1;\n2;');
-    machine.start();
+    var machine = new Machine();
+    machine.evaluate('1;\n2;');
     machine.step();
     assert.deepEqual(machine.runner.state, {
       value: {
@@ -39,8 +39,8 @@ describe('Machine#step', function () {
   });
 
   it('should do multiple steps', function () {
-    var machine = new Machine('1;\n2;\n3;');
-    machine.start();
+    var machine = new Machine();
+    machine.evaluate('1;\n2;\n3;');
     machine.step();
     assert.deepEqual(machine.runner.state, {
       value: {
@@ -72,8 +72,8 @@ describe('Machine#step', function () {
   });
 
   it('should step to completion', function () {
-    var machine = new Machine('1;\n2;\n3;');
-    machine.start();
+    var machine = new Machine();
+    machine.evaluate('1;\n2;\n3;');
     var i = 0;
     var done = false;
     while (!done) {
@@ -84,12 +84,12 @@ describe('Machine#step', function () {
   });
 
   it('should step through functions in sandbox', function (done) {
-    var machine = new Machine('foo()', {
+    var machine = new Machine({
       foo: function () {
         done();
       }
     });
-    machine.start();
+    machine.evaluate('foo()');
     machine.step();
     machine.step();
   });
@@ -104,7 +104,7 @@ describe('Machine#step', function () {
     });
 
     var i = 0;
-    var machine = new Machine(source, {
+    var machine = new Machine({
       bar: function (arg) {
         assert.equal(arg, i);
         if (i === 1) {
@@ -114,7 +114,7 @@ describe('Machine#step', function () {
       }
     });
 
-    machine.start();
+    machine.evaluate(source);
     // function foo()
     machine.step();
     // foo()
@@ -136,9 +136,10 @@ describe('Machine#step', function () {
 describe('Machine#run', function () {
 
   it('should run to completion', function () {
-    var machine = new Machine('1;\n2;\n3;');
-    machine.start();
-    machine.run();
+    var machine = new Machine();
+    machine
+      .evaluate('1;\n2;\n3;')
+      .run();
   });
 
   it('should nested function calls', function (done) {
@@ -164,7 +165,7 @@ describe('Machine#run', function () {
     });
 
     var i = 0;
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         var expected;
         switch (i) {
@@ -192,7 +193,9 @@ describe('Machine#run', function () {
       }
     });
 
-    machine.start().run();
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should nested function delcerations and calls', function (done) {
@@ -213,7 +216,7 @@ describe('Machine#run', function () {
     });
 
     var i = 0;
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         var expected;
         switch (i) {
@@ -238,7 +241,9 @@ describe('Machine#run', function () {
       }
     });
 
-    machine.start().run();
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should run recursive fib', function (done) {
@@ -259,7 +264,7 @@ describe('Machine#run', function () {
     });
 
     var i = 0;
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         if (i == 0) {
           assert.equal(arg, 1);
@@ -270,7 +275,10 @@ describe('Machine#run', function () {
         }
       }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should run handle calls in expressions', function (done) {
@@ -281,13 +289,16 @@ describe('Machine#run', function () {
       report(foo());
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         assert.equal(arg, 1);
         done();
       }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should run handle multiple calls in expressions', function (done) {
@@ -301,13 +312,16 @@ describe('Machine#run', function () {
       report(foo() - bar());
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
           assert.equal(arg, -1);
           done();
         }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should run handle multiple calls in expressions', function (done) {
@@ -321,13 +335,16 @@ describe('Machine#run', function () {
       report(foo(bar()));
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
           assert.equal(arg, 3);
           done();
         }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
 
@@ -342,13 +359,16 @@ describe('Machine#run', function () {
       report(foo(bar() * bar()) - foo(bar()));
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
           assert.equal(arg, -1.5);
           done();
         }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
 
@@ -362,13 +382,16 @@ describe('Machine#run', function () {
       report(fn1()());
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
           assert.equal(arg, 1);
           done();
         }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should handle first order functions', function (done) {
@@ -385,13 +408,16 @@ describe('Machine#run', function () {
       );
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
           assert.equal(arg, 42);
           done();
         }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should respect context', function (done) {
@@ -403,13 +429,16 @@ describe('Machine#run', function () {
       report(foo.f());
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         assert.equal(arg, 1);
         done();
       }
     });
-    machine.start().run()
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should respect context in thunks', function (done) {
@@ -421,13 +450,16 @@ describe('Machine#run', function () {
       foo.f();
     });
 
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg) {
         assert(arg);
         done();
       }
     });
-    machine.start().run();
+
+    machine
+      .evaluate(source)
+      .run();
   });
 
   it('should handle iterators', function (done) {
@@ -438,7 +470,7 @@ describe('Machine#run', function () {
     });
 
     var i = 0;
-    var machine = new Machine(source, {
+    var machine = new Machine({
       report: function (arg, index) {
         assert.equal(index, i);
         switch (i) {
@@ -457,6 +489,8 @@ describe('Machine#run', function () {
       }
     });
 
-    machine.start().run();
+    machine
+      .evaluate(source)
+      .run();
   });
 });
