@@ -59,7 +59,7 @@ describe('non functions', function () {
 
   it('should convert toplevel program into a toplevel generator', function () {
     var code = 'console.log(1);';
-    var ast = transform(recast.parse(code));
+    var ast = transform(recast.parse(code), 'testFile');
     assert(ast.program.body[0].generator);
   });
 
@@ -85,6 +85,7 @@ describe('non functions', function () {
         function *__top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
             "scope": [{
               "name": "x",
@@ -225,7 +226,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should do right by for loops', function () {
@@ -242,6 +243,7 @@ describe('non functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
             "scope": [{
               "name": "i",
@@ -309,7 +311,7 @@ describe('non functions', function () {
         }
       })
     );
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should do right by for in loops', function () {
@@ -326,6 +328,7 @@ describe('non functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
             "scope": [{
               "name": "p",
@@ -395,7 +398,7 @@ describe('non functions', function () {
         }
       })
     );
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should do right by loops with complex expressions', function () {
@@ -413,6 +416,7 @@ describe('non functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -518,7 +522,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should work with while loops', function () {
@@ -536,6 +540,7 @@ describe('non functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
             "scope": [],
             "evalInScope": function (expr) {
@@ -608,7 +613,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 });
 
@@ -628,6 +633,7 @@ describe('functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -666,6 +672,7 @@ describe('functions', function () {
             function* foo() {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "foo",
 
                 "scope": [{
@@ -734,6 +741,7 @@ describe('functions', function () {
                 function* y() {
                   yield {
                     "type": "stackFrame",
+                    "filename": "testFile",
                     "name": "y",
                     "scope": [],
                     "evalInScope": function (expr) {
@@ -751,7 +759,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should convert function declerations to generators', function () {
@@ -768,6 +776,7 @@ describe('functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -806,6 +815,7 @@ describe('functions', function () {
             function *foo() {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "foo",
                 "scope": [],
                 "evalInScope": function (expr) {
@@ -834,7 +844,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should convert function expressions to generators', function () {
@@ -851,6 +861,7 @@ describe('functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -889,6 +900,7 @@ describe('functions', function () {
             var foo = function* () {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "anonymous function",
                 "scope": [],
                 "evalInScope": function (expr) {
@@ -916,7 +928,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should *thunkify and yield function calls', function () {
@@ -934,6 +946,7 @@ describe('functions', function () {
         function*__top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -972,6 +985,7 @@ describe('functions', function () {
             function *foo() {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "foo",
                 "scope": [],
                 "evalInScope": function (expr) {
@@ -1016,7 +1030,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
   it('should *thunkify and yield nested function calls wat', function () {
@@ -1040,6 +1054,7 @@ describe('functions', function () {
         function* __top() {
           yield {
             "type": "stackFrame",
+            "filename": "testFile",
             "name": "Global Scope",
 
             "scope": [{
@@ -1092,6 +1107,7 @@ describe('functions', function () {
             function* bar() {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "bar",
 
                 "scope": [{
@@ -1130,6 +1146,7 @@ describe('functions', function () {
                 function* baz() {
                   yield {
                     "type": "stackFrame",
+                    "filename": "testFile",
                     "name": "baz",
                     "scope": [],
                     "evalInScope": function (expr) {
@@ -1193,6 +1210,7 @@ describe('functions', function () {
             function* foo() {
               yield {
                 "type": "stackFrame",
+                "filename": "testFile",
                 "name": "foo",
                 "scope": [],
                 "evalInScope": function (expr) {
@@ -1241,7 +1259,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source), expected);
+    assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
 });

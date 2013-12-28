@@ -516,10 +516,11 @@ describe('Machine#getCallStack', function () {
 
     var machine = new Machine();
 
-    machine.evaluate(source);
+    machine.evaluate(source, 'testFile');
 
     var globalScope = {
       type: 'stackFrame',
+      filename: 'testFile',
       name: 'Global Scope',
       scope: [ { name: 'fn1', locs: [ { start: {line:1, column:9},
                                         end: {line: 1, column: 12}}]},
@@ -547,6 +548,7 @@ describe('Machine#getCallStack', function () {
 
     var fn1Scope = {
       type: 'stackFrame',
+      filename: 'testFile',
       name: 'fn1',
       scope: [],
       "evalInScope": null
@@ -564,6 +566,7 @@ describe('Machine#getCallStack', function () {
 
     var fn2Scope = {
       type: 'stackFrame',
+      filename: 'testFile',
       name: 'fn2',
       scope: [
         {name: 'x', locs: [{
