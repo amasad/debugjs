@@ -11,4 +11,4 @@ var transformedCode = recast.print(
   transform(recast.parse(source))
 ).code;
 
-process.stdout.write(regenerator(transformedCode, { includeRuntime: true }));
+process.stdout.write(regenerator(transformedCode));
