@@ -77,10 +77,6 @@ describe('non functions', function () {
             x;
             break;
         }
-        while (x) {
-          true;
-          continue;
-        }
       })
     );
 
@@ -200,52 +196,6 @@ describe('non functions', function () {
                 };
 
                 break;
-              }
-            }
-          }
-          {
-            yield {
-              "start": {
-                "line": 12,
-                "column": 0
-              },
-
-              "end": {
-                "line": 15,
-                "column": 1
-              }
-            };
-
-            while (x) {
-              {
-                yield {
-                  "start": {
-                    "line": 13,
-                    "column": 0
-                  },
-
-                  "end": {
-                    "line": 13,
-                    "column": 5
-                  }
-                };
-
-                true;
-                {
-                  yield {
-                    "start": {
-                      "line": 14,
-                      "column": 0
-                    },
-
-                    "end": {
-                      "line": 14,
-                      "column": 9
-                    }
-                  };
-
-                  continue;
-                }
               }
             }
           }
@@ -445,6 +395,87 @@ describe('non functions', function () {
                   };
 
                   2;
+                }
+              }
+
+              yield {
+                "start": {
+                  "line": 1,
+                  "column": 0
+                },
+
+                "end": {
+                  "line": 4,
+                  "column": 1
+                }
+              };
+            }
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
+  it('should work with while loops', function () {
+    var source = parse(
+      fnString(function () {
+        while (x) {
+          true;
+          continue;
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* __top() {
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 4,
+                "column": 1
+              }
+            };
+
+            while (x) {
+              {
+                {
+                  yield {
+                    "start": {
+                      "line": 2,
+                      "column": 0
+                    },
+
+                    "end": {
+                      "line": 2,
+                      "column": 5
+                    }
+                  };
+
+                  true;
+                }
+
+                {
+                  yield {
+                    "start": {
+                      "line": 3,
+                      "column": 0
+                    },
+
+                    "end": {
+                      "line": 3,
+                      "column": 9
+                    }
+                  };
+
+                  continue;
                 }
               }
 
