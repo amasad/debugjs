@@ -86,7 +86,7 @@ describe('non functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function *top() {
+        function *__top() {
           {
             yield {
               "start": {
@@ -267,7 +267,7 @@ describe('non functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
@@ -316,7 +316,7 @@ describe('non functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
@@ -365,7 +365,7 @@ describe('non functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
@@ -421,7 +421,7 @@ describe('functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
@@ -471,7 +471,7 @@ describe('functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
@@ -522,7 +522,7 @@ describe('functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function*top() {
+        function*__top() {
           {
             yield {
               "start": {
@@ -596,7 +596,7 @@ describe('functions', function () {
 
     var expected = parse(
       fnString(function () {
-        function* top() {
+        function* __top() {
           {
             yield {
               "start": {
