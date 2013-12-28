@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "mocha --harmony-generators tests/"
+    "test": "mocha --harmony-generators tests/ && mocha tests/machine.test.js"
   },
   "author": "",
   "license": "BSD-2-Clause",
