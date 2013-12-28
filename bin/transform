@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+
+var fs = require('fs');
+var transform = require('../lib/transform');
+var recast = require('recast');
+var regenerator = require('regenerator');
+
+var source = fs.readFileSync(process.argv[2]).toString();
+
+var transformedCode = recast.print(
+  transform(recast.parse(source))
+).code;
+
+process.stdout.write(regenerator(transformedCode, { includeRuntime: true }));
