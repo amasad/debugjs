@@ -507,6 +507,13 @@ describe('Machine#getCallStack', function () {
       fn1();
     });
 
+    function nullifyEvalInscope(stack) {
+      return stack.map(function (frame) {
+        if (frame) frame.evalInScope = null;
+        return frame;
+      });
+    };
+
     var machine = new Machine();
 
     machine.evaluate(source);
@@ -517,39 +524,41 @@ describe('Machine#getCallStack', function () {
       scope: [ { name: 'fn1', locs: [ { start: {line:1, column:9},
                                         end: {line: 1, column: 12}}]},
                { name: 'fn2', locs:  [ { start: {line:4, column:9},
-                                        end: {line: 4, column: 12}}]} ]
+                                        end: {line: 4, column: 12}}]} ],
+      "evalInScope": null
     };
 
     // fn1
     machine.step();
-    assert.deepEqual(machine.getCallStack(), [globalScope]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
     // fn2
     machine.step();
-    assert.deepEqual(machine.getCallStack(), [globalScope]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
     // fn3()
     machine.step();
-    assert.deepEqual(machine.getCallStack(), [globalScope]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
     // call fn3
     machine.step();
     // TODO take care of undefined.
-    assert.deepEqual(machine.getCallStack(), [globalScope, undefined]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope, undefined]);
 
     var fn1Scope = {
       type: 'stackFrame',
       name: 'fn1',
-      scope: []
+      scope: [],
+      "evalInScope": null
     };
     // fn2();
     machine.step();
-    assert.deepEqual(machine.getCallStack(), [globalScope, fn1Scope]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope, fn1Scope]);
 
     // call fn2
     machine.step();
     // TODO take care of undefined.
-    assert.deepEqual(machine.getCallStack(), [
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [
       globalScope, fn1Scope, undefined
     ]);
 
@@ -567,12 +576,13 @@ describe('Machine#getCallStack', function () {
             column: 5
           }
         }]}
-      ]
+      ],
+      "evalInScope": null
     };
     // call fn2
     machine.step();
     // TODO take care of undefined.
-    assert.deepEqual(machine.getCallStack(), [
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [
       globalScope, fn1Scope, fn2Scope
     ]);
   });

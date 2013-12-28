@@ -99,7 +99,10 @@ describe('non functions', function () {
                       "column": 5
                   }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -252,7 +255,10 @@ describe('non functions', function () {
                       "column": 10
                   }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -334,7 +340,10 @@ describe('non functions', function () {
                       "column": 10
                   }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -434,7 +443,10 @@ describe('non functions', function () {
                   "column": 21
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -525,7 +537,10 @@ describe('non functions', function () {
           yield {
             "type": "stackFrame",
             "name": "Global Scope",
-            "scope": []
+            "scope": [],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -629,7 +644,10 @@ describe('functions', function () {
                   "column": 12
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -678,7 +696,10 @@ describe('functions', function () {
                       "column": 10
                     }
                   }]
-                }]
+                }],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
 
               {
@@ -714,7 +735,10 @@ describe('functions', function () {
                   yield {
                     "type": "stackFrame",
                     "name": "y",
-                    "scope": []
+                    "scope": [],
+                    "evalInScope": function (expr) {
+                      return eval(expr);
+                    }
                   };
 
                   {}
@@ -760,7 +784,10 @@ describe('functions', function () {
                   "column": 12
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -780,7 +807,10 @@ describe('functions', function () {
               yield {
                 "type": "stackFrame",
                 "name": "foo",
-                "scope": []
+                "scope": [],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
 
               {
@@ -837,7 +867,10 @@ describe('functions', function () {
                   "column": 7
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -857,7 +890,10 @@ describe('functions', function () {
               yield {
                 "type": "stackFrame",
                 "name": "anonymous function",
-                "scope": []
+                "scope": [],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
               {
                 yield {
@@ -914,7 +950,10 @@ describe('functions', function () {
                   "column": 12
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -934,7 +973,10 @@ describe('functions', function () {
               yield {
                 "type": "stackFrame",
                 "name": "foo",
-                "scope": []
+                "scope": [],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
               {
                 yield {
@@ -1028,7 +1070,10 @@ describe('functions', function () {
                   "column": 12
                 }
               }]
-            }]
+            }],
+            "evalInScope": function (expr) {
+              return eval(expr);
+            }
           };
 
           {
@@ -1063,7 +1108,10 @@ describe('functions', function () {
                       "column": 12
                     }
                   }]
-                }]
+                }],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
 
               {
@@ -1083,7 +1131,10 @@ describe('functions', function () {
                   yield {
                     "type": "stackFrame",
                     "name": "baz",
-                    "scope": []
+                    "scope": [],
+                    "evalInScope": function (expr) {
+                      return eval(expr);
+                    }
                   };
 
                   {
@@ -1143,7 +1194,10 @@ describe('functions', function () {
               yield {
                 "type": "stackFrame",
                 "name": "foo",
-                "scope": []
+                "scope": [],
+                "evalInScope": function (expr) {
+                  return eval(expr);
+                }
               };
 
               {
