@@ -256,7 +256,7 @@ describe('non functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should do right by for loops', function () {
+  it('should do right by for loops wat', function () {
     var source = parse(
       fnString(function () {
         for (var i = 0; i < 50; i++) {
@@ -283,20 +283,34 @@ describe('non functions', function () {
 
             for (var i = 0; i < 50; i++) {
               {
-                yield {
-                  "start": {
-                    "line": 2,
-                    "column": 0
-                  },
+                {
+                  yield {
+                    "start": {
+                      "line": 2,
+                      "column": 0
+                    },
 
-                  "end": {
-                    "line": 2,
-                    "column": 2
-                  }
-                };
+                    "end": {
+                      "line": 2,
+                      "column": 2
+                    }
+                  };
 
-                1;
+                  1;
+                }
               }
+
+              yield {
+                "start": {
+                  "line": 1,
+                  "column": 0
+                },
+
+                "end": {
+                  "line": 3,
+                  "column": 1
+                }
+              };
             }
           }
         }
@@ -332,20 +346,35 @@ describe('non functions', function () {
 
             for (var p in o) {
               {
+                {
+                  yield {
+                    "start": {
+                      "line": 2,
+                      "column": 0
+                    },
+
+                    "end": {
+                      "line": 2,
+                      "column": 2
+                    }
+                  };
+
+                  1;
+                }
+
                 yield {
                   "start": {
-                    "line": 2,
+                    "line": 1,
                     "column": 0
                   },
 
                   "end": {
-                    "line": 2,
-                    "column": 2
+                    "line": 3,
+                    "column": 1
                   }
                 };
-
-                1;
               }
+
             }
           }
         }
@@ -359,6 +388,7 @@ describe('non functions', function () {
       fnString(function () {
         for (var i = foo(), b = bar(); i < 50; i++) {
           1;
+          2;
         }
       })
     );
@@ -374,7 +404,7 @@ describe('non functions', function () {
               },
 
               "end": {
-                "line": 3,
+                "line": 4,
                 "column": 1
               }
             };
@@ -385,20 +415,50 @@ describe('non functions', function () {
               return bar();
             }, this); i < 50; i++) {
               {
-                yield {
-                  "start": {
-                    "line": 2,
-                    "column": 0
-                  },
+                {
+                  yield {
+                    "start": {
+                      "line": 2,
+                      "column": 0
+                    },
 
-                  "end": {
-                    "line": 2,
-                    "column": 2
-                  }
-                };
+                    "end": {
+                      "line": 2,
+                      "column": 2
+                    }
+                  };
 
-                1;
+                  1;
+                }
+
+                {
+                  yield {
+                    "start": {
+                      "line": 3,
+                      "column": 0
+                    },
+
+                    "end": {
+                      "line": 3,
+                      "column": 2
+                    }
+                  };
+
+                  2;
+                }
               }
+
+              yield {
+                "start": {
+                  "line": 1,
+                  "column": 0
+                },
+
+                "end": {
+                  "line": 4,
+                  "column": 1
+                }
+              };
             }
           }
         }
