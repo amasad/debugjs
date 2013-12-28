@@ -83,6 +83,25 @@ describe('non functions', function () {
     var expected = parse(
       fnString(function () {
         function *__top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+            "scope": [{
+              "name": "x",
+              "locs": [{
+                  "start": {
+                      "line": 3,
+                      "column": 4
+                  },
+
+                  "end": {
+                      "line": 3,
+                      "column": 5
+                  }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -206,7 +225,7 @@ describe('non functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should do right by for loops wat', function () {
+  it('should do right by for loops', function () {
     var source = parse(
       fnString(function () {
         for (var i = 0; i < 50; i++) {
@@ -218,6 +237,24 @@ describe('non functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+            "scope": [{
+              "name": "i",
+              "locs": [{
+                  "start": {
+                      "line": 1,
+                      "column": 9
+                  },
+                  "end": {
+                      "line": 1,
+                      "column": 10
+                  }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -281,6 +318,25 @@ describe('non functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+            "scope": [{
+              "name": "p",
+              "locs": [{
+                  "start": {
+                      "line": 1,
+                      "column": 9
+                  },
+
+                  "end": {
+                      "line": 1,
+                      "column": 10
+                  }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -346,6 +402,41 @@ describe('non functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "i",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 10
+                }
+              }]
+            }, {
+              "name": "b",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 20
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 21
+                }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -431,6 +522,12 @@ describe('non functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+            "scope": []
+          };
+
           {
             yield {
               "start": {
@@ -501,6 +598,138 @@ describe('non functions', function () {
 });
 
 describe('functions', function () {
+  it('should add a stack frame step to functions', function () {
+    var source = parse(
+      fnString(function () {
+        function foo() {
+          var x = 1;
+          function y() {}
+        }
+      })
+    );
+
+    var expected = parse(
+      fnString(function () {
+        function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "foo",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 12
+                }
+              }]
+            }]
+          };
+
+          {
+            yield {
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+
+              "end": {
+                "line": 4,
+                "column": 1
+              }
+            };
+
+            function* foo() {
+              yield {
+                "type": "stackFrame",
+                "name": "foo",
+
+                "scope": [{
+                  "name": "x",
+
+                  "locs": [{
+                    "start": {
+                      "line": 2,
+                      "column": 4
+                    },
+
+                    "end": {
+                      "line": 2,
+                      "column": 5
+                    }
+                  }]
+                }, {
+                  "name": "y",
+
+                  "locs": [{
+                    "start": {
+                      "line": 3,
+                      "column": 9
+                    },
+
+                    "end": {
+                      "line": 3,
+                      "column": 10
+                    }
+                  }]
+                }]
+              };
+
+              {
+                yield {
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 2,
+                    "column": 10
+                  }
+                };
+
+                var x = 1;
+              }
+
+              {
+                yield {
+                  "start": {
+                    "line": 3,
+                    "column": 0
+                  },
+
+                  "end": {
+                    "line": 3,
+                    "column": 15
+                  }
+                };
+
+                function* y() {
+                  yield {
+                    "type": "stackFrame",
+                    "name": "y",
+                    "scope": []
+                  };
+
+                  {}
+                }
+              }
+
+            }
+          }
+        }
+      })
+    );
+
+    assertEqualsAST(transform(source), expected);
+  });
+
   it('should convert function declerations to generators', function () {
     var source = parse(
       fnString(function () {
@@ -513,6 +742,27 @@ describe('functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "foo",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 12
+                }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -527,6 +777,12 @@ describe('functions', function () {
             };
 
             function *foo() {
+              yield {
+                "type": "stackFrame",
+                "name": "foo",
+                "scope": []
+              };
+
               {
                 yield {
                   "start": {
@@ -563,6 +819,27 @@ describe('functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "foo",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 4
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 7
+                }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -577,6 +854,11 @@ describe('functions', function () {
             };
 
             var foo = function* () {
+              yield {
+                "type": "stackFrame",
+                "name": "anonymous function",
+                "scope": []
+              };
               {
                 yield {
                   "start": {
@@ -614,6 +896,27 @@ describe('functions', function () {
     var expected = parse(
       fnString(function () {
         function*__top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "foo",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 12
+                }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -628,6 +931,11 @@ describe('functions', function () {
             };
 
             function *foo() {
+              yield {
+                "type": "stackFrame",
+                "name": "foo",
+                "scope": []
+              };
               {
                 yield {
                   "start": {
@@ -669,7 +977,7 @@ describe('functions', function () {
     assertEqualsAST(transform(source), expected);
   });
 
-  it('should *thunkify and yield nested function calls', function () {
+  it('should *thunkify and yield nested function calls wat', function () {
     var source = parse(
       fnString(function () {
         function bar() {
@@ -688,6 +996,41 @@ describe('functions', function () {
     var expected = parse(
       fnString(function () {
         function* __top() {
+          yield {
+            "type": "stackFrame",
+            "name": "Global Scope",
+
+            "scope": [{
+              "name": "bar",
+
+              "locs": [{
+                "start": {
+                  "line": 1,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 12
+                }
+              }]
+            }, {
+              "name": "foo",
+
+              "locs": [{
+                "start": {
+                  "line": 7,
+                  "column": 9
+                },
+
+                "end": {
+                  "line": 7,
+                  "column": 12
+                }
+              }]
+            }]
+          };
+
           {
             yield {
               "start": {
@@ -702,6 +1045,27 @@ describe('functions', function () {
             };
 
             function* bar() {
+              yield {
+                "type": "stackFrame",
+                "name": "bar",
+
+                "scope": [{
+                  "name": "baz",
+
+                  "locs": [{
+                    "start": {
+                      "line": 2,
+                      "column": 9
+                    },
+
+                    "end": {
+                      "line": 2,
+                      "column": 12
+                    }
+                  }]
+                }]
+              };
+
               {
                 yield {
                   "start": {
@@ -716,6 +1080,12 @@ describe('functions', function () {
                 };
 
                 function* baz() {
+                  yield {
+                    "type": "stackFrame",
+                    "name": "baz",
+                    "scope": []
+                  };
+
                   {
                     yield {
                       "start": {
@@ -770,6 +1140,12 @@ describe('functions', function () {
             };
 
             function* foo() {
+              yield {
+                "type": "stackFrame",
+                "name": "foo",
+                "scope": []
+              };
+
               {
                 yield {
                   "start": {
