@@ -108,6 +108,7 @@ describe('non functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -123,6 +124,7 @@ describe('non functions', function () {
           }
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 2,
                 "column": 0
@@ -136,6 +138,7 @@ describe('non functions', function () {
           }
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 3,
                 "column": 0
@@ -149,6 +152,7 @@ describe('non functions', function () {
           }
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 4,
                 "column": 0
@@ -161,6 +165,7 @@ describe('non functions', function () {
             if (x) {
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 5,
                     "column": 0
@@ -176,6 +181,7 @@ describe('non functions', function () {
           }
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 7,
                 "column": 0
@@ -191,6 +197,7 @@ describe('non functions', function () {
             case 5:
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 9,
                     "column": 0
@@ -207,6 +214,7 @@ describe('non functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 10,
                     "column": 0
@@ -265,6 +273,7 @@ describe('non functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -280,6 +289,7 @@ describe('non functions', function () {
               {
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 2,
                       "column": 0
@@ -296,6 +306,7 @@ describe('non functions', function () {
               }
 
               yield {
+                "type": "step",
                 "start": {
                   "line": 1,
                   "column": 0
@@ -351,6 +362,7 @@ describe('non functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -366,6 +378,7 @@ describe('non functions', function () {
               {
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 2,
                       "column": 0
@@ -381,6 +394,7 @@ describe('non functions', function () {
                 }
 
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 1,
                     "column": 0
@@ -455,6 +469,7 @@ describe('non functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -474,6 +489,7 @@ describe('non functions', function () {
               {
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 2,
                       "column": 0
@@ -490,6 +506,7 @@ describe('non functions', function () {
 
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 3,
                       "column": 0
@@ -506,6 +523,7 @@ describe('non functions', function () {
               }
 
               yield {
+                "type": "step",
                 "start": {
                   "line": 1,
                   "column": 0
@@ -550,6 +568,7 @@ describe('non functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -565,6 +584,7 @@ describe('non functions', function () {
               {
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 2,
                       "column": 0
@@ -581,6 +601,7 @@ describe('non functions', function () {
 
                 {
                   yield {
+                    "type": "step",
                     "start": {
                       "line": 3,
                       "column": 0
@@ -597,6 +618,7 @@ describe('non functions', function () {
               }
 
               yield {
+                "type": "step",
                 "start": {
                   "line": 1,
                   "column": 0
@@ -658,6 +680,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -711,6 +734,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 2,
                     "column": 0
@@ -727,6 +751,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 3,
                     "column": 0
@@ -801,6 +826,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -825,6 +851,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 2,
                     "column": 0
@@ -886,6 +913,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -909,6 +937,7 @@ describe('functions', function () {
               };
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 2,
                     "column": 0
@@ -971,6 +1000,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -994,6 +1024,7 @@ describe('functions', function () {
               };
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 2,
                     "column": 0
@@ -1011,6 +1042,7 @@ describe('functions', function () {
           }
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 4,
                 "column": 0
@@ -1093,6 +1125,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 1,
                 "column": 0
@@ -1132,6 +1165,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 2,
                     "column": 0
@@ -1156,6 +1190,7 @@ describe('functions', function () {
 
                   {
                     yield {
+                      "type": "step",
                       "start": {
                         "line": 3,
                         "column": 0
@@ -1176,6 +1211,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 5,
                     "column": 0
@@ -1196,6 +1232,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 7,
                 "column": 0
@@ -1220,6 +1257,7 @@ describe('functions', function () {
 
               {
                 yield {
+                  "type": "step",
                   "start": {
                     "line": 8,
                     "column": 0
@@ -1240,6 +1278,7 @@ describe('functions', function () {
 
           {
             yield {
+              "type": "step",
               "start": {
                 "line": 10,
                 "column": 0

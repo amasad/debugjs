@@ -25,6 +25,7 @@ describe('Machine#step', function () {
     machine.step();
     assert.deepEqual(machine.runner.state, {
       value: {
+        type: 'step',
         start: {
           line: 1,
           column: 0
@@ -44,6 +45,7 @@ describe('Machine#step', function () {
     machine.step();
     assert.deepEqual(machine.runner.state, {
       value: {
+        type: 'step',
         start: {
           line: 1,
           column: 0
@@ -58,6 +60,7 @@ describe('Machine#step', function () {
     machine.step();
     assert.deepEqual(machine.runner.state, {
       value: {
+        type: 'step',
         start: {
           line: 2,
           column: 0
