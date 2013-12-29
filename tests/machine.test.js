@@ -9,7 +9,7 @@ describe('Machine#evaluate', function () {
   it('should evaluate but not run the top-level function', function () {
     var machine = new Machine();
     machine.evaluate('1;\n2;');
-    assert.deepEqual(machine.runner.state, {
+    assert.deepEqual(machine.getState(), {
       value: null,
       done: false
     });
@@ -23,7 +23,7 @@ describe('Machine#step', function () {
     var machine = new Machine();
     machine.evaluate('1;\n2;');
     machine.step();
-    assert.deepEqual(machine.runner.state, {
+    assert.deepEqual(machine.getState(), {
       value: {
         type: 'step',
         start: {
@@ -43,7 +43,7 @@ describe('Machine#step', function () {
     var machine = new Machine();
     machine.evaluate('1;\n2;\n3;');
     machine.step();
-    assert.deepEqual(machine.runner.state, {
+    assert.deepEqual(machine.getState(), {
       value: {
         type: 'step',
         start: {
@@ -58,7 +58,7 @@ describe('Machine#step', function () {
       done: false
     });
     machine.step();
-    assert.deepEqual(machine.runner.state, {
+    assert.deepEqual(machine.getState(), {
       value: {
         type: 'step',
         start: {
@@ -80,7 +80,7 @@ describe('Machine#step', function () {
     var i = 0;
     var done = false;
     while (!done) {
-      var done = machine.step().done;
+      var done = machine.step();
       i++;
     }
     assert.equal(i, 4);
@@ -131,7 +131,7 @@ describe('Machine#step', function () {
     // end
     machine.step();
 
-    assert(machine.runner.state.done);
+    assert(machine.halted);
   });
 
 });
