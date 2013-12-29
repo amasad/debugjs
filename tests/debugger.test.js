@@ -96,23 +96,46 @@ describe('Debugger#run', function () {
   });
 
 
-//  it('should break on breakpoint and continue', function (done) {
-//     var i = 0;
-//     var machine = new Machine({
-//       report: function (arg) {
-//         assert.equal(arg, ++i);
-//       }
-//     });
+ it('should break on breakpoint and continue', function () {
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
 
-//     var debuggr = new Debugger(machine);
-//     machine.evaluate('1;\nreport(1);\n3;\nreport(2);', 'fooFile');
+    var debuggr = new Debugger(machine);
+    machine.evaluate('1;\nreport(1);\n3;\nreport(2);', 'fooFile');
 
-//     debuggr.on('breakpoint', function (data) {
-      
-//     });
+    debuggr.addBreakpoints('fooFile', [3]);
+    var stopped = debuggr.run();
+    assert(stopped);
+    var data = JSON.parse(JSON.stringify(debuggr.breakpointData));
+    assert.deepEqual(data, {
+      filename: 'fooFile',
+      lineno: 3,
+      step: {
+        type: 'step',
+        start: {
+          line: 3,
+          column: 0
+        },
+        end: {
+          line: 3,
+          column: 2
+        }
+      },
+      stack: [{
+        type: 'stackFrame',
+        filename: 'fooFile',
+        name: 'Global Scope',
+        scope: []
+      }]
+    });
 
-//     debuggr.addBreakpoints('fooFile', [3]);
-//     debuggr.run();
-//   });
+    stopped = debuggr.run();
+    assert(!stopped);
+    assert.equal(i, 2);
+  });
 
 });
