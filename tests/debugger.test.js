@@ -1,5 +1,6 @@
 var Machine = require('../lib/machine');
 var Debugger = require('../lib/debugger');
+var fnString = require('../tests/utils').fnString;
 var assert = require('assert');
 
 describe('Debugger#addBreakpoints', function () {
@@ -137,5 +138,58 @@ describe('Debugger#run', function () {
     assert(!stopped);
     assert.equal(i, 2);
   });
+
+ it('should break and continue on multiple files', function () {
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    var debuggr = new Debugger(machine);
+    var fooFile = fnString(function () {
+      report(1);
+      bar();
+    });
+    var barFile = fnString(function () {
+      function bar() {
+        1;
+        report(2);
+      }
+      this.bar = bar;
+    });
+
+    machine.evaluate(barFile, 'barFile').run();
+    machine.evaluate(fooFile, 'fooFile');
+    debuggr.addBreakpoints('barFile', [2]);
+    var stopped = debuggr.run();
+    var data = JSON.parse(JSON.stringify(debuggr.breakpointData));
+    assert.deepEqual(data, {
+      filename: 'barFile',
+      lineno: 2,
+      step: {
+        type: 'step',
+        start: {
+          line: 2,
+          column: 0
+        },
+        end: {
+          line: 2,
+          column: 2
+        }
+      },
+      stack: [{
+        type: 'stackFrame',
+        filename: 'fooFile',
+        name: 'Global Scope',
+        scope: []
+      }, {
+        type: 'stackFrame',
+        filename: 'barFile',
+        name: 'bar',
+        scope: []
+      }]
+    });
+ });
 
 });
