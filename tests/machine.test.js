@@ -80,7 +80,7 @@ describe('Machine#step', function () {
     var i = 0;
     var done = false;
     while (!done) {
-      var done = machine.step();
+      done = machine.step();
       i++;
     }
     assert.equal(i, 4);
