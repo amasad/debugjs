@@ -124,6 +124,7 @@ describe('Machine#step', function () {
     machine.step();
     // call foo
     machine.step();
+    assert.equal(machine.getState().value.type, 'functionCall');
     // bar(0)
     machine.step();
     // call bar 0
