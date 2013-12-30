@@ -594,3 +594,110 @@ describe('Machine#getCallStack', function () {
     ]);
   });
 });
+
+describe('exceptions', function () {
+
+  it('should handle exceptions', function (done) {
+    var source = fnString(function () {
+      foo;
+    });
+
+    var machine = new Machine();
+    machine.evaluate(source);
+    machine.on('error', function (e) {
+      assert.equal(e.name, 'ReferenceError');
+      done();
+    })
+    machine.run();
+  });
+
+  it('should handle try/catch', function (done) {
+    var source = fnString(function () {
+      try {
+        foo;
+      } catch (e) {
+        report(e);
+      }
+    });
+
+    var machine = new Machine({
+      report: function (e) {
+        assert.equal(e.name, 'ReferenceError');
+        done();
+      }
+    });
+    machine.evaluate(source);
+    machine.run();
+  });
+
+  it('should handle exceptions with function calls', function (done) {
+    var source = fnString(function () {
+      foo;
+    });
+
+    var machine = new Machine();
+    machine.evaluate(source);
+    machine.on('error', function (e) {
+      assert.equal(e.name, 'ReferenceError');
+      done();
+    })
+    machine.run();
+  });
+
+  it('should handle try/catch in called function body wat', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        watman;
+      }
+      try {
+        foo();
+      } catch (e) {
+        report(e);
+      }
+    });
+
+    var machine = new Machine({
+      report: function (e) {
+        assert.equal(e.name, 'ReferenceError');
+        done();
+      }
+    });
+    machine.evaluate(source);
+    machine.run();
+  });
+
+  it('should handle try/catch in deeply nested calls', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        function bar() {
+          function baz() {
+            null.fun();
+          }
+        }
+        try {
+          bar();
+        } catch (e) {
+          report(e);
+        }
+      }
+      foo();
+      report('done');
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (e) {
+        if (i) {
+          assert.equal(e.name, 'TypeError');
+        } else {
+          assert.equal(e, 'done');
+          done();
+        }
+        i++;
+      }
+    });
+    machine.evaluate(source);
+    machine.run();
+  });
+
+});
