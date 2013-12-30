@@ -79,8 +79,8 @@ describe('Machine#step', function () {
     machine.evaluate('1;\n2;\n3;');
     var i = 0;
     var done = false;
-    while (!done) {
-      done = machine.step();
+    while (!machine.halted) {
+      machine.step();
       i++;
     }
     assert.equal(i, 4);
