@@ -673,6 +673,7 @@ describe('exceptions', function () {
           function baz() {
             null.fun();
           }
+          baz();
         }
         try {
           bar();
@@ -687,7 +688,7 @@ describe('exceptions', function () {
     var i = 0;
     var machine = new Machine({
       report: function (e) {
-        if (i) {
+        if (!i) {
           assert.equal(e.name, 'TypeError');
         } else {
           assert.equal(e, 'done');
