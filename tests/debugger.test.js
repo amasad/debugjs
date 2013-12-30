@@ -134,8 +134,8 @@ describe('Debugger#run', function () {
       }]
     });
 
-    stopped = debuggr.run();
-    assert(!stopped);
+    debuggr.run();
+    assert(machine.halted);
     assert.equal(i, 2);
   });
 
@@ -275,9 +275,10 @@ describe('Debugger#run', function () {
         function foo() {
           report(1);
           report(2);
+          report(3);
         }
         foo();
-        report(3);
+        report(4);
         report('will never happen');
       });
 
@@ -299,8 +300,42 @@ describe('Debugger#run', function () {
       debuggr.stepOut();
       // report(3)
       debuggr.stepOver();
-      assert.equal(i, 3);
+      assert.equal(i, 4);
     });
+
+    it('should step out of function calls', function () {
+      var source = fnString(function () {
+        function foo() {
+          report(1);
+          report(2);
+          report(3);
+        }
+        foo();
+        report(4);
+        report('will never happen');
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+        }
+      });
+      machine.evaluate(source, 'foo');
+      var debuggr = new Debugger(machine);
+      debuggr.addBreakpoints('foo', [4]);
+      // function foo
+      debuggr.stepOver();
+      // foo ()
+      debuggr.stepIn();
+      // report(1)
+      debuggr.stepOver();
+      // report(2)
+      debuggr.stepOut();
+      // Paused on 3
+      assert.equal(i, 2);
+    });
+
 
   });
 
