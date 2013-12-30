@@ -230,6 +230,36 @@ describe('Debugger#run', function () {
       }
     });
 
+    it('should handle breakpoints while steping over', function () {
+      var source = fnString(function () {
+        function foo() {
+          report(1);
+          report(2);
+          report(3);
+        }
+        foo();
+        report(4);
+        report('will never happen');
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+        }
+      });
+      machine.evaluate(source, 'foo');
+      var debuggr = new Debugger(machine);
+      debuggr.addBreakpoints('foo', [4]);
+      // function foo
+      debuggr.stepOver();
+      // foo ()
+      debuggr.stepOver();
+      // Paused on 3
+      assert.equal(i, 2);
+    });
+
+
   });
 
   describe('Debugger#stepIn', function () {
@@ -303,7 +333,7 @@ describe('Debugger#run', function () {
       assert.equal(i, 4);
     });
 
-    it('should step out of function calls', function () {
+    it('should handle breakpoints while steping over', function () {
       var source = fnString(function () {
         function foo() {
           report(1);
