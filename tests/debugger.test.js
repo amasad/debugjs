@@ -206,7 +206,6 @@ describe('Debugger#run', function () {
       var i = 0;
       var machine = new Machine({
         report: function (arg) {
-          console.log(arg);
           if (!i) {
             assert.equal(arg, 'foo');
           } else {

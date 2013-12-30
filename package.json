@@ -13,7 +13,8 @@
     "jsonpretty": "0.0.1",
     "brfs": "0.0.8",
     "context-eval": "0.0.1",
-    "regenerator": "~0.3.4"
+    "regenerator": "~0.3.4",
+    "generator-supported": "0.0.1"
   },
   "devDependencies": {
     "esprima": "git://github.com/ariya/esprima.git#harmony"
