@@ -702,3 +702,48 @@ describe('exceptions', function () {
   });
 
 });
+
+describe('debugger statements', function () {
+  var source = fnString(function () {
+    1;
+    debugger;
+    report('done');
+  });
+
+  it('should ignore debugger statements', function (done) {
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, 'done');
+        done();
+      }
+    });
+    machine.evaluate(source).run();
+    assert(machine.halted);
+  });
+
+  it('should pause on debugger statements', function () {
+    var machine = new Machine();
+    machine.evaluate(source);
+    var called = false;
+    machine.on('debugger', function () {
+      called = true;
+    });
+    machine.run();
+    assert(!machine.halted);
+    assert.deepEqual(machine.getState(), {
+      done: false,
+      value: {
+        type: 'debugger',
+        start: {
+          line: 2,
+          column: 0
+        },
+        end: {
+          line: 2,
+          column: 9
+        }
+      }
+    });
+  });
+
+});

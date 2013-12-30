@@ -1301,4 +1301,87 @@ describe('functions', function () {
     assertEqualsAST(transform(source, 'testFile'), expected);
   });
 
+  describe('debugger statements', function () {
+
+    it('should replace debugger statements with yields', function () {
+      var source = parse(
+        fnString(function () {
+          1;
+          debugger;
+          2;
+        })
+      );
+
+      var expected = parse(
+        fnString(function () {
+          function* __top() {
+            yield {
+              "type": "stackFrame",
+              "filename": "testFile",
+              "name": "Global Scope",
+              "scope": [],
+
+              "evalInScope": function(expr) {
+                return eval(expr);
+              }
+            };
+
+            {
+              yield {
+                "type": "step",
+
+                "start": {
+                  "line": 1,
+                  "column": 0
+                },
+
+                "end": {
+                  "line": 1,
+                  "column": 2
+                }
+              };
+
+              1;
+            }
+
+            yield {
+              "type": "debugger",
+
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+
+              "end": {
+                "line": 2,
+                "column": 9
+              }
+            };
+
+            {
+              yield {
+                "type": "step",
+
+                "start": {
+                  "line": 3,
+                  "column": 0
+                },
+
+                "end": {
+                  "line": 3,
+                  "column": 2
+                }
+              };
+
+              2;
+            }
+          }
+        })
+      );
+
+      assertEqualsAST(transform(source, 'testFile'), expected);
+    });
+
+  });
+
 });
