@@ -192,4 +192,117 @@ describe('Debugger#run', function () {
     });
  });
 
+  describe('Debugger#stepOver', function () {
+
+    it('should step over function calls', function (done) {
+      var source = fnString(function () {
+        function foo() {
+          report('foo');
+        }
+        foo();
+        report('done');
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          console.log(arg);
+          if (!i) {
+            assert.equal(arg, 'foo');
+          } else {
+            assert.equal(arg, 'done');
+            done();
+          }
+          i++;
+        }
+      });
+      machine.evaluate(source);
+      var debuggr = new Debugger(machine);
+      // function foo
+      debuggr.stepOver();
+      // foo()
+      debuggr.stepOver();
+      // report()
+      debuggr.stepOver();
+
+      // Make sure it steps until it's halted.
+      while (!machine.halted) {
+        debuggr.stepOver();
+      }
+    });
+
+  });
+
+  describe('Debugger#stepIn', function () {
+
+    it('should step into function calls', function () {
+      var source = fnString(function () {
+        function foo() {
+          report('foo');
+        }
+        foo();
+      });
+
+      var called = false;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, 'foo');
+          called = true;
+        }
+      });
+      machine.evaluate(source);
+      var debuggr = new Debugger(machine);
+      // function foo
+      debuggr.stepIn();
+      // foo ()
+      debuggr.stepIn();
+      // report('foo')
+      debuggr.stepIn();
+      assert(called);
+
+      // Make sure it steps until it's halted.
+      while (!machine.halted) {
+        debuggr.stepIn();
+      }
+    });
+
+  });
+
+
+  describe('Debugger#stepOut', function () {
+
+    it('should step out of function calls', function () {
+      var source = fnString(function () {
+        function foo() {
+          report(1);
+          report(2);
+        }
+        foo();
+        report(3);
+        report('will never happen');
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+        }
+      });
+      machine.evaluate(source);
+      var debuggr = new Debugger(machine);
+      // function foo
+      debuggr.stepOver();
+      // foo ()
+      debuggr.stepIn();
+      // report(1)
+      debuggr.stepOver();
+      // report(2)
+      debuggr.stepOut();
+      // report(3)
+      debuggr.stepOver();
+      assert.equal(i, 3);
+    });
+
+  });
+
 });
