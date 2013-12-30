@@ -333,7 +333,7 @@ describe('Debugger#run', function () {
       assert.equal(i, 4);
     });
 
-    it('should handle breakpoints while steping over', function () {
+    it('should handle breakpoints while steping out', function () {
       var source = fnString(function () {
         function foo() {
           report(1);
