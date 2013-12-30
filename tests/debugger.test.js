@@ -5,8 +5,10 @@ var assert = require('assert');
 
 describe('Debugger#addBreakpoints', function () {
 
+  var machine = new Machine();
+
   it('should add breakpoints to file', function () {
-    var debuggr = new Debugger({});
+    var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [1, 2, 3]);
     assert.deepEqual(debuggr.getBreakpoints('foo'), {1: true, 2: true, 3: true});
   });
@@ -14,16 +16,17 @@ describe('Debugger#addBreakpoints', function () {
 });
 
 describe('Debugger#removeBreakpoints', function () {
+  var machine = new Machine();
 
   it('should remove some breakpoints from file', function () {
-    var debuggr = new Debugger({});
+    var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [1, 2, 3]);
     debuggr.removeBreakpoints('foo', [3]);
     assert.deepEqual(debuggr.getBreakpoints('foo'), {1: true, 2: true, 3: null});
   });
 
   it('should remove all breakpoints from file', function () {
-    var debuggr = new Debugger({});
+    var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [1, 2, 3]);
     debuggr.removeBreakpoints('foo');
     assert.equal(debuggr.getBreakpoints('foo'), null);
@@ -367,6 +370,54 @@ describe('Debugger#run', function () {
     });
 
 
+  });
+
+});
+
+describe('debugger statement', function () {
+  it('should pause and emit on debugger statement', function (done) {
+    var source = fnString(function () {
+      report(1);
+      debugger;
+      report(2);
+    });
+
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(1, arg);
+      }
+    });
+
+    machine.evaluate(source, 'fooFile');
+    var debuggr = new Debugger(machine);
+    debuggr.on('breakpoint', function (data) {
+      data = JSON.parse(JSON.stringify(data));
+      assert.deepEqual(data, {
+        filename: 'fooFile',
+        lineno: 2,
+        step: {
+          type: 'debugger',
+          start: {
+            line: 2,
+            column: 0
+          },
+          end: {
+            line: 2,
+            column: 9
+          }
+        },
+        stack: [{
+          type: 'stackFrame',
+          filename: 'fooFile',
+          name: 'Global Scope',
+          scope: []
+        }]
+      });
+      done();
+    });
+
+    debuggr.run();
+    assert(machine.paused);
   });
 
 });
