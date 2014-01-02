@@ -262,6 +262,37 @@ describe('Debugger#run', function () {
       assert.equal(i, 2);
     });
 
+    it('should step out when the function ends', function () {
+      var source = fnString(function () {
+        function foo() {
+          report(1);
+          report(2);
+          report(3);
+        }
+        foo();
+        report(4);
+        report('will never happen');
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+        }
+      });
+      machine.evaluate(source, 'foo');
+      var debuggr = new Debugger(machine);
+      debuggr.addBreakpoints('foo', [4]);
+      // function foo
+      debuggr.stepOver();
+      // foo ()
+      debuggr.stepOver();
+      // report(3)
+      debuggr.stepOver();
+      // report(4)
+      debuggr.stepOver();
+      assert.equal(i, 4);
+    });
 
   });
 
