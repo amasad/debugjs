@@ -1,0 +1,15 @@
+{
+  "name": "debugjs",
+  "repo": "amasad/debugjs",
+  "description": "Lightweight JavaScript VM and stepping debugger",
+  "version": "0.0.1",
+  "keywords": [],
+  "dependencies": {},
+  "development": {},
+  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": [
+    "dist/bundle.js",
+    "dist/index.js"
+  ]
+}
