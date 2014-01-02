@@ -1,7 +1,8 @@
-function Context(sandbox) {
+function Context(sandbox, parentElement) {
   this.iframe = document.createElement('iframe');
   this.iframe.style.display = 'none';
-  document.body.appendChild(this.iframe);
+  parentElement = parentElement || document.body;
+  parentElement.appendChild(this.iframe);
   var win = this.iframe.contentWindow;
   sandbox = sandbox || {};
   Object.keys(sandbox).forEach(function (key) {

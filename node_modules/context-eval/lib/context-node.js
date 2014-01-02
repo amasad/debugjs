@@ -1,6 +1,8 @@
 var vm = require('vm');
 
-function Context(sandbox) {
+// ParentElement is only used in the browser but we want to came the same
+// interface.
+function Context(sandbox, parentElement) {
   this.context = vm.createContext(sandbox || {});
 }
 

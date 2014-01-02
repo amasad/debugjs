@@ -10,6 +10,14 @@ describe('Context', function () {
       context.destroy();
     });
 
+    if (typeof document !== 'undefined') {
+      it('should append iframe to parent', function () {
+        var div = document.createElement('div');
+        context = new Context(null, div);
+        assert.strictEqual(div.childNodes[0], context.iframe);
+      });
+    }
+
     it('should evaluate code', function () {
       context = new Context();
       assert.equal(context.evaluate('1 + 1'), 2);
