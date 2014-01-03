@@ -7,2560 +7,2158 @@ wrapGenerator.mark(__top);
 function __top() {
     var call, prototypeOfObject, _toString, toObject, boxedString, splitString;
 
-    return wrapGenerator(function __top$($ctx) {
-        while (1) switch ($ctx.next) {
+    return wrapGenerator(function __top$($ctx1) {
+        while (1) switch ($ctx1.next) {
         case 0:
-            $ctx.next = 2;
+            $ctx1.next = 2;
 
             return {
-                "start": {
-                    "line": 5,
-                    "column": 0
-                },
+                "type": "stackFrame",
+                "filename": "array.js",
+                "name": "Global Scope",
 
-                "end": {
-                    "line": 5,
-                    "column": 35
+                "scope": [{
+                    "name": "call",
+
+                    "locs": [{
+                        "start": {
+                            "line": 5,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 5,
+                            "column": 8
+                        }
+                    }]
+                }, {
+                    "name": "prototypeOfObject",
+
+                    "locs": [{
+                        "start": {
+                            "line": 6,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 6,
+                            "column": 21
+                        }
+                    }]
+                }, {
+                    "name": "_toString",
+
+                    "locs": [{
+                        "start": {
+                            "line": 8,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 8,
+                            "column": 13
+                        }
+                    }]
+                }, {
+                    "name": "toObject",
+
+                    "locs": [{
+                        "start": {
+                            "line": 9,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 9,
+                            "column": 12
+                        }
+                    }]
+                }, {
+                    "name": "boxedString",
+
+                    "locs": [{
+                        "start": {
+                            "line": 17,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 17,
+                            "column": 15
+                        }
+                    }]
+                }, {
+                    "name": "splitString",
+
+                    "locs": [{
+                        "start": {
+                            "line": 18,
+                            "column": 4
+                        },
+
+                        "end": {
+                            "line": 18,
+                            "column": 15
+                        }
+                    }]
+                }],
+
+                "evalInScope": function(expr) {
+                    return eval(expr);
                 }
             }
         case 2:
             call = Function.prototype.call;
-            $ctx.next = 5;
-
-            return {
-                "start": {
-                    "line": 6,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 6,
-                    "column": 41
-                }
-            }
-        case 5:
             prototypeOfObject = Object.prototype;
-            $ctx.next = 8;
-
-            return {
-                "start": {
-                    "line": 8,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 8,
-                    "column": 54
-                }
-            }
-        case 8:
-            $ctx.next = 10;
+            $ctx1.next = 6;
 
             return __thunk(wrapGenerator.mark(function thunk() {
-                return wrapGenerator(function thunk$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function thunk$($ctx2) {
+                    while (1) switch ($ctx2.next) {
                     case 0:
-                        $ctx.rval = call.bind(prototypeOfObject.toString);
-                        delete $ctx.thrown;
-                        $ctx.next = 4;
+                        $ctx2.rval = call.bind(prototypeOfObject.toString);
+                        delete $ctx2.thrown;
+                        $ctx2.next = 4;
                         break;
                     case 4:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx2.stop();
                     }
                 }, this);
             }), this);
-        case 10:
-            _toString = $ctx.sent;
-            $ctx.next = 13;
+        case 6:
+            _toString = $ctx1.sent;
 
-            return {
-                "start": {
-                    "line": 9,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 14,
-                    "column": 2
-                }
-            }
-        case 13:
             toObject = wrapGenerator.mark(function(o) {
-                return wrapGenerator(function($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function($ctx3) {
+                    while (1) switch ($ctx3.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx3.next = 2;
 
                         return {
-                            "start": {
-                                "line": 10,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "anonymous function",
 
-                            "end": {
-                                "line": 12,
-                                "column": 5
+                            "scope": [{
+                                "name": "o",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 9,
+                                        "column": 25
+                                    },
+
+                                    "end": {
+                                        "line": 9,
+                                        "column": 26
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
                         if (!(o == null)) {
-                            $ctx.next = 6;
+                            $ctx3.next = 4;
                             break;
                         }
 
-                        $ctx.next = 5;
-
-                        return {
-                            "start": {
-                                "line": 11,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 11,
-                                "column": 61
-                            }
-                        }
-                    case 5:
                         throw new TypeError("can't convert "+o+" to object");
-                    case 6:
-                        $ctx.next = 8;
-
-                        return {
-                            "start": {
-                                "line": 13,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 13,
-                                "column": 21
-                            }
-                        }
-                    case 8:
-                        $ctx.next = 10;
+                    case 4:
+                        $ctx3.next = 6;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx4) {
+                                while (1) switch ($ctx4.next) {
                                 case 0:
-                                    $ctx.rval = Object(o);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx4.rval = Object(o);
+                                    delete $ctx4.thrown;
+                                    $ctx4.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx4.stop();
                                 }
                             }, this);
                         }), this);
-                    case 10:
-                        $ctx.rval = $ctx.sent;
-                        delete $ctx.thrown;
-                        $ctx.next = 14;
+                    case 6:
+                        $ctx3.rval = $ctx3.sent;
+                        delete $ctx3.thrown;
+                        $ctx3.next = 10;
                         break;
-                    case 14:
+                    case 10:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx3.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 16;
-
-            return {
-                "start": {
-                    "line": 17,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 18,
-                    "column": 63
-                }
-            }
-        case 16:
-            $ctx.next = 18;
+            $ctx1.next = 10;
 
             return __thunk(wrapGenerator.mark(function thunk() {
-                return wrapGenerator(function thunk$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function thunk$($ctx5) {
+                    while (1) switch ($ctx5.next) {
                     case 0:
-                        $ctx.rval = Object("a");
-                        delete $ctx.thrown;
-                        $ctx.next = 4;
+                        $ctx5.rval = Object("a");
+                        delete $ctx5.thrown;
+                        $ctx5.next = 4;
                         break;
                     case 4:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx5.stop();
                     }
                 }, this);
             }), this);
-        case 18:
-            boxedString = $ctx.sent;
+        case 10:
+            boxedString = $ctx1.sent;
             splitString = boxedString[0] != "a" || !(0 in boxedString);
-            $ctx.next = 22;
 
-            return {
-                "start": {
-                    "line": 19,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 41,
-                    "column": 2
-                }
-            }
-        case 22:
             Array.prototype.forEach = wrapGenerator.mark(function forEach(fun /*, thisp*/) {
                 var object, self, thisp, i, length, $args = arguments;
 
-                return wrapGenerator(function forEach$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function forEach$($ctx6) {
+                    while (1) switch ($ctx6.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx6.next = 2;
 
                         return {
-                            "start": {
-                                "line": 20,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "forEach",
 
-                            "end": {
-                                "line": 26,
-                                "column": 35
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 19,
+                                        "column": 43
+                                    },
+
+                                    "end": {
+                                        "line": 19,
+                                        "column": 46
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 20,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 20,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 21,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 21,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "thisp",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 24,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 24,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 25,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 25,
+                                        "column": 9
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 26,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 26,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx6.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx7) {
+                                while (1) switch ($ctx7.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx7.rval = toObject(this);
+                                    delete $ctx7.thrown;
+                                    $ctx7.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx7.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t0 = splitString;
+                        object = $ctx6.sent;
+                        $ctx6.t0 = splitString;
 
-                        if (!$ctx.t0) {
-                            $ctx.next = 11;
+                        if (!$ctx6.t0) {
+                            $ctx6.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx6.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx8) {
+                                while (1) switch ($ctx8.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx8.rval = _toString(this);
+                                    delete $ctx8.thrown;
+                                    $ctx8.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx8.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t1 = $ctx.sent;
-                        $ctx.t0 = $ctx.t1 == "[object String]";
+                        $ctx6.t1 = $ctx6.sent;
+                        $ctx6.t0 = $ctx6.t1 == "[object String]";
                     case 11:
-                        if (!$ctx.t0) {
-                            $ctx.next = 17;
+                        if (!$ctx6.t0) {
+                            $ctx6.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx6.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx9) {
+                                while (1) switch ($ctx9.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx9.rval = this.split("");
+                                    delete $ctx9.thrown;
+                                    $ctx9.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx9.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t2 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx6.t2 = $ctx6.sent;
+                        $ctx6.next = 18;
                         break;
                     case 17:
-                        $ctx.t2 = object;
+                        $ctx6.t2 = object;
                     case 18:
-                        self = $ctx.t2;
+                        self = $ctx6.t2;
                         thisp = $args[1];
                         i = -1;
                         length = self.length >>> 0;
-                        $ctx.next = 24;
+                        $ctx6.next = 24;
 
-                        return {
-                            "start": {
-                                "line": 29,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 31,
-                                "column": 5
-                            }
-                        }
+                        return __thunk(wrapGenerator.mark(function thunk() {
+                            return wrapGenerator(function thunk$($ctx10) {
+                                while (1) switch ($ctx10.next) {
+                                case 0:
+                                    $ctx10.rval = _toString(fun);
+                                    delete $ctx10.thrown;
+                                    $ctx10.next = 4;
+                                    break;
+                                case 4:
+                                case "end":
+                                    return $ctx10.stop();
+                                }
+                            }, this);
+                        }), this);
                     case 24:
-                        $ctx.next = 26;
+                        $ctx6.t3 = $ctx6.sent;
 
-                        return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
-                                case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
-                                    break;
-                                case 4:
-                                case "end":
-                                    return $ctx.stop();
-                                }
-                            }, this);
-                        }), this);
-                    case 26:
-                        $ctx.t3 = $ctx.sent;
-
-                        if (!($ctx.t3 != "[object Function]")) {
-                            $ctx.next = 31;
+                        if (!($ctx6.t3 != "[object Function]")) {
+                            $ctx6.next = 27;
                             break;
                         }
 
-                        $ctx.next = 30;
-
-                        return {
-                            "start": {
-                                "line": 30,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 30,
-                                "column": 30
-                            }
-                        }
-                    case 30:
                         throw new TypeError();
-                    case 31:
-                        $ctx.next = 33;
-
-                        return {
-                            "start": {
-                                "line": 33,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 40,
-                                "column": 5
-                            }
-                        }
-                    case 33:
+                    case 27:
                         if (!(++i < length)) {
-                            $ctx.next = 43;
+                            $ctx6.next = 33;
                             break;
                         }
 
-                        $ctx.next = 36;
-
-                        return {
-                            "start": {
-                                "line": 34,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 39,
-                                "column": 9
-                            }
-                        }
-                    case 36:
                         if (!(i in self)) {
-                            $ctx.next = 41;
+                            $ctx6.next = 31;
                             break;
                         }
 
-                        $ctx.next = 39;
-
-                        return {
-                            "start": {
-                                "line": 38,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 38,
-                                "column": 48
-                            }
-                        }
-                    case 39:
-                        $ctx.next = 41;
+                        $ctx6.next = 31;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx11) {
+                                while (1) switch ($ctx11.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(thisp, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx11.rval = fun.call(thisp, self[i], i, object);
+                                    delete $ctx11.thrown;
+                                    $ctx11.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx11.stop();
                                 }
                             }, this);
                         }), this);
-                    case 41:
-                        $ctx.next = 33;
+                    case 31:
+                        $ctx6.next = 27;
                         break;
-                    case 43:
+                    case 33:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx6.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 25;
-
-            return {
-                "start": {
-                    "line": 44,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 63,
-                    "column": 2
-                }
-            }
-        case 25:
             Array.prototype.map = wrapGenerator.mark(function map(fun /*, thisp*/) {
                 var object, self, length, result, thisp, i, $args = arguments;
 
-                return wrapGenerator(function map$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function map$($ctx12) {
+                    while (1) switch ($ctx12.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx12.next = 2;
 
                         return {
-                            "start": {
-                                "line": 45,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "map",
 
-                            "end": {
-                                "line": 51,
-                                "column": 29
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 44,
+                                        "column": 35
+                                    },
+
+                                    "end": {
+                                        "line": 44,
+                                        "column": 38
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 45,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 45,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 46,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 46,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 49,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 49,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "result",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 50,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 50,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "thisp",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 51,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 51,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 58,
+                                        "column": 13
+                                    },
+
+                                    "end": {
+                                        "line": 58,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx12.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx13) {
+                                while (1) switch ($ctx13.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx13.rval = toObject(this);
+                                    delete $ctx13.thrown;
+                                    $ctx13.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx13.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t4 = splitString;
+                        object = $ctx12.sent;
+                        $ctx12.t4 = splitString;
 
-                        if (!$ctx.t4) {
-                            $ctx.next = 11;
+                        if (!$ctx12.t4) {
+                            $ctx12.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx12.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx14) {
+                                while (1) switch ($ctx14.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx14.rval = _toString(this);
+                                    delete $ctx14.thrown;
+                                    $ctx14.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx14.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t5 = $ctx.sent;
-                        $ctx.t4 = $ctx.t5 == "[object String]";
+                        $ctx12.t5 = $ctx12.sent;
+                        $ctx12.t4 = $ctx12.t5 == "[object String]";
                     case 11:
-                        if (!$ctx.t4) {
-                            $ctx.next = 17;
+                        if (!$ctx12.t4) {
+                            $ctx12.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx12.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx15) {
+                                while (1) switch ($ctx15.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx15.rval = this.split("");
+                                    delete $ctx15.thrown;
+                                    $ctx15.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx15.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t6 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx12.t6 = $ctx12.sent;
+                        $ctx12.next = 18;
                         break;
                     case 17:
-                        $ctx.t6 = object;
+                        $ctx12.t6 = object;
                     case 18:
-                        self = $ctx.t6;
+                        self = $ctx12.t6;
                         length = self.length >>> 0;
-                        $ctx.next = 22;
+                        $ctx12.next = 22;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx16) {
+                                while (1) switch ($ctx16.next) {
                                 case 0:
-                                    $ctx.rval = Array(length);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx16.rval = Array(length);
+                                    delete $ctx16.thrown;
+                                    $ctx16.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx16.stop();
                                 }
                             }, this);
                         }), this);
                     case 22:
-                        result = $ctx.sent;
+                        result = $ctx12.sent;
                         thisp = $args[1];
-                        $ctx.next = 26;
+                        $ctx12.next = 26;
 
-                        return {
-                            "start": {
-                                "line": 54,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 56,
-                                "column": 5
-                            }
-                        }
+                        return __thunk(wrapGenerator.mark(function thunk() {
+                            return wrapGenerator(function thunk$($ctx17) {
+                                while (1) switch ($ctx17.next) {
+                                case 0:
+                                    $ctx17.rval = _toString(fun);
+                                    delete $ctx17.thrown;
+                                    $ctx17.next = 4;
+                                    break;
+                                case 4:
+                                case "end":
+                                    return $ctx17.stop();
+                                }
+                            }, this);
+                        }), this);
                     case 26:
-                        $ctx.next = 28;
+                        $ctx12.t7 = $ctx12.sent;
 
-                        return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
-                                case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
-                                    break;
-                                case 4:
-                                case "end":
-                                    return $ctx.stop();
-                                }
-                            }, this);
-                        }), this);
-                    case 28:
-                        $ctx.t7 = $ctx.sent;
-
-                        if (!($ctx.t7 != "[object Function]")) {
-                            $ctx.next = 33;
+                        if (!($ctx12.t7 != "[object Function]")) {
+                            $ctx12.next = 29;
                             break;
                         }
 
-                        $ctx.next = 32;
-
-                        return {
-                            "start": {
-                                "line": 55,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 55,
-                                "column": 56
-                            }
-                        }
-                    case 32:
                         throw new TypeError(fun + " is not a function");
-                    case 33:
-                        $ctx.next = 35;
-
-                        return {
-                            "start": {
-                                "line": 58,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 61,
-                                "column": 5
-                            }
-                        }
-                    case 35:
+                    case 29:
                         i = 0;
-                    case 36:
+                    case 30:
                         if (!(i < length)) {
-                            $ctx.next = 48;
+                            $ctx12.next = 38;
                             break;
                         }
 
-                        $ctx.next = 39;
-
-                        return {
-                            "start": {
-                                "line": 59,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 60,
-                                "column": 60
-                            }
-                        }
-                    case 39:
                         if (!(i in self)) {
-                            $ctx.next = 45;
+                            $ctx12.next = 35;
                             break;
                         }
 
-                        $ctx.next = 42;
-
-                        return {
-                            "start": {
-                                "line": 60,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 60,
-                                "column": 60
-                            }
-                        }
-                    case 42:
-                        $ctx.next = 44;
+                        $ctx12.next = 34;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx18) {
+                                while (1) switch ($ctx18.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(thisp, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx18.rval = fun.call(thisp, self[i], i, object);
+                                    delete $ctx18.thrown;
+                                    $ctx18.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx18.stop();
                                 }
                             }, this);
                         }), this);
-                    case 44:
-                        result[i] = $ctx.sent;
-                    case 45:
+                    case 34:
+                        result[i] = $ctx12.sent;
+                    case 35:
                         i++;
-                        $ctx.next = 36;
+                        $ctx12.next = 30;
                         break;
-                    case 48:
-                        $ctx.next = 50;
-
-                        return {
-                            "start": {
-                                "line": 62,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 62,
-                                "column": 18
-                            }
-                        }
-                    case 50:
-                        $ctx.rval = result;
-                        delete $ctx.thrown;
-                        $ctx.next = 54;
+                    case 38:
+                        $ctx12.rval = result;
+                        delete $ctx12.thrown;
+                        $ctx12.next = 42;
                         break;
-                    case 54:
+                    case 42:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx12.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 28;
-
-            return {
-                "start": {
-                    "line": 65,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 89,
-                    "column": 2
-                }
-            }
-        case 28:
             Array.prototype.filter = wrapGenerator.mark(function filter(fun /*, thisp */) {
                 var object, self, length, result, value, thisp, i, $args = arguments;
 
-                return wrapGenerator(function filter$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function filter$($ctx19) {
+                    while (1) switch ($ctx19.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx19.next = 2;
 
                         return {
-                            "start": {
-                                "line": 66,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "filter",
 
-                            "end": {
-                                "line": 73,
-                                "column": 29
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 65,
+                                        "column": 41
+                                    },
+
+                                    "end": {
+                                        "line": 65,
+                                        "column": 44
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 66,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 66,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 67,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 67,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 70,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 70,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "result",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 71,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 71,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "value",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 72,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 72,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "thisp",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 73,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 73,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 80,
+                                        "column": 13
+                                    },
+
+                                    "end": {
+                                        "line": 80,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx19.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx20) {
+                                while (1) switch ($ctx20.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx20.rval = toObject(this);
+                                    delete $ctx20.thrown;
+                                    $ctx20.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx20.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t8 = splitString;
+                        object = $ctx19.sent;
+                        $ctx19.t8 = splitString;
 
-                        if (!$ctx.t8) {
-                            $ctx.next = 11;
+                        if (!$ctx19.t8) {
+                            $ctx19.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx19.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx21) {
+                                while (1) switch ($ctx21.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx21.rval = _toString(this);
+                                    delete $ctx21.thrown;
+                                    $ctx21.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx21.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t9 = $ctx.sent;
-                        $ctx.t8 = $ctx.t9 == "[object String]";
+                        $ctx19.t9 = $ctx19.sent;
+                        $ctx19.t8 = $ctx19.t9 == "[object String]";
                     case 11:
-                        if (!$ctx.t8) {
-                            $ctx.next = 17;
+                        if (!$ctx19.t8) {
+                            $ctx19.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx19.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx22) {
+                                while (1) switch ($ctx22.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx22.rval = this.split("");
+                                    delete $ctx22.thrown;
+                                    $ctx22.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx22.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t10 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx19.t10 = $ctx19.sent;
+                        $ctx19.next = 18;
                         break;
                     case 17:
-                        $ctx.t10 = object;
+                        $ctx19.t10 = object;
                     case 18:
-                        self = $ctx.t10;
+                        self = $ctx19.t10;
                         length = self.length >>> 0;
                         result = [];
                         thisp = $args[1];
-                        $ctx.next = 24;
+                        $ctx19.next = 24;
 
-                        return {
-                            "start": {
-                                "line": 76,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 78,
-                                "column": 5
-                            }
-                        }
+                        return __thunk(wrapGenerator.mark(function thunk() {
+                            return wrapGenerator(function thunk$($ctx23) {
+                                while (1) switch ($ctx23.next) {
+                                case 0:
+                                    $ctx23.rval = _toString(fun);
+                                    delete $ctx23.thrown;
+                                    $ctx23.next = 4;
+                                    break;
+                                case 4:
+                                case "end":
+                                    return $ctx23.stop();
+                                }
+                            }, this);
+                        }), this);
                     case 24:
-                        $ctx.next = 26;
+                        $ctx19.t11 = $ctx19.sent;
 
-                        return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
-                                case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
-                                    break;
-                                case 4:
-                                case "end":
-                                    return $ctx.stop();
-                                }
-                            }, this);
-                        }), this);
-                    case 26:
-                        $ctx.t11 = $ctx.sent;
-
-                        if (!($ctx.t11 != "[object Function]")) {
-                            $ctx.next = 31;
+                        if (!($ctx19.t11 != "[object Function]")) {
+                            $ctx19.next = 27;
                             break;
                         }
 
-                        $ctx.next = 30;
-
-                        return {
-                            "start": {
-                                "line": 77,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 77,
-                                "column": 56
-                            }
-                        }
-                    case 30:
                         throw new TypeError(fun + " is not a function");
-                    case 31:
-                        $ctx.next = 33;
-
-                        return {
-                            "start": {
-                                "line": 80,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 87,
-                                "column": 5
-                            }
-                        }
-                    case 33:
+                    case 27:
                         i = 0;
-                    case 34:
+                    case 28:
                         if (!(i < length)) {
-                            $ctx.next = 53;
+                            $ctx19.next = 39;
                             break;
                         }
 
-                        $ctx.next = 37;
-
-                        return {
-                            "start": {
-                                "line": 81,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 86,
-                                "column": 9
-                            }
-                        }
-                    case 37:
                         if (!(i in self)) {
-                            $ctx.next = 50;
+                            $ctx19.next = 36;
                             break;
                         }
 
-                        $ctx.next = 40;
-
-                        return {
-                            "start": {
-                                "line": 82,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 82,
-                                "column": 28
-                            }
-                        }
-                    case 40:
                         value = self[i];
-                        $ctx.next = 43;
-
-                        return {
-                            "start": {
-                                "line": 83,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 85,
-                                "column": 13
-                            }
-                        }
-                    case 43:
-                        $ctx.next = 45;
+                        $ctx19.next = 33;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx24) {
+                                while (1) switch ($ctx24.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(thisp, value, i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx24.rval = fun.call(thisp, value, i, object);
+                                    delete $ctx24.thrown;
+                                    $ctx24.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx24.stop();
                                 }
                             }, this);
                         }), this);
-                    case 45:
-                        if (!$ctx.sent) {
-                            $ctx.next = 50;
+                    case 33:
+                        if (!$ctx19.sent) {
+                            $ctx19.next = 36;
                             break;
                         }
 
-                        $ctx.next = 48;
-
-                        return {
-                            "start": {
-                                "line": 84,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 84,
-                                "column": 35
-                            }
-                        }
-                    case 48:
-                        $ctx.next = 50;
+                        $ctx19.next = 36;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx25) {
+                                while (1) switch ($ctx25.next) {
                                 case 0:
-                                    $ctx.rval = result.push(value);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx25.rval = result.push(value);
+                                    delete $ctx25.thrown;
+                                    $ctx25.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx25.stop();
                                 }
                             }, this);
                         }), this);
-                    case 50:
+                    case 36:
                         i++;
-                        $ctx.next = 34;
+                        $ctx19.next = 28;
                         break;
-                    case 53:
-                        $ctx.next = 55;
-
-                        return {
-                            "start": {
-                                "line": 88,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 88,
-                                "column": 18
-                            }
-                        }
-                    case 55:
-                        $ctx.rval = result;
-                        delete $ctx.thrown;
-                        $ctx.next = 59;
+                    case 39:
+                        $ctx19.rval = result;
+                        delete $ctx19.thrown;
+                        $ctx19.next = 43;
                         break;
-                    case 59:
+                    case 43:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx19.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 31;
-
-            return {
-                "start": {
-                    "line": 93,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 112,
-                    "column": 2
-                }
-            }
-        case 31:
             Array.prototype.every = wrapGenerator.mark(function every(fun /*, thisp */) {
                 var object, self, length, thisp, i, $args = arguments;
 
-                return wrapGenerator(function every$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function every$($ctx26) {
+                    while (1) switch ($ctx26.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx26.next = 2;
 
                         return {
-                            "start": {
-                                "line": 94,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "every",
 
-                            "end": {
-                                "line": 99,
-                                "column": 29
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 93,
+                                        "column": 39
+                                    },
+
+                                    "end": {
+                                        "line": 93,
+                                        "column": 42
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 94,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 94,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 95,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 95,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 98,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 98,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "thisp",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 99,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 99,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 106,
+                                        "column": 13
+                                    },
+
+                                    "end": {
+                                        "line": 106,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx26.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx27) {
+                                while (1) switch ($ctx27.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx27.rval = toObject(this);
+                                    delete $ctx27.thrown;
+                                    $ctx27.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx27.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t12 = splitString;
+                        object = $ctx26.sent;
+                        $ctx26.t12 = splitString;
 
-                        if (!$ctx.t12) {
-                            $ctx.next = 11;
+                        if (!$ctx26.t12) {
+                            $ctx26.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx26.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx28) {
+                                while (1) switch ($ctx28.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx28.rval = _toString(this);
+                                    delete $ctx28.thrown;
+                                    $ctx28.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx28.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t13 = $ctx.sent;
-                        $ctx.t12 = $ctx.t13 == "[object String]";
+                        $ctx26.t13 = $ctx26.sent;
+                        $ctx26.t12 = $ctx26.t13 == "[object String]";
                     case 11:
-                        if (!$ctx.t12) {
-                            $ctx.next = 17;
+                        if (!$ctx26.t12) {
+                            $ctx26.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx26.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx29) {
+                                while (1) switch ($ctx29.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx29.rval = this.split("");
+                                    delete $ctx29.thrown;
+                                    $ctx29.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx29.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t14 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx26.t14 = $ctx26.sent;
+                        $ctx26.next = 18;
                         break;
                     case 17:
-                        $ctx.t14 = object;
+                        $ctx26.t14 = object;
                     case 18:
-                        self = $ctx.t14;
+                        self = $ctx26.t14;
                         length = self.length >>> 0;
                         thisp = $args[1];
-                        $ctx.next = 23;
+                        $ctx26.next = 23;
 
-                        return {
-                            "start": {
-                                "line": 102,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 104,
-                                "column": 5
-                            }
-                        }
+                        return __thunk(wrapGenerator.mark(function thunk() {
+                            return wrapGenerator(function thunk$($ctx30) {
+                                while (1) switch ($ctx30.next) {
+                                case 0:
+                                    $ctx30.rval = _toString(fun);
+                                    delete $ctx30.thrown;
+                                    $ctx30.next = 4;
+                                    break;
+                                case 4:
+                                case "end":
+                                    return $ctx30.stop();
+                                }
+                            }, this);
+                        }), this);
                     case 23:
-                        $ctx.next = 25;
+                        $ctx26.t15 = $ctx26.sent;
 
-                        return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
-                                case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
-                                    break;
-                                case 4:
-                                case "end":
-                                    return $ctx.stop();
-                                }
-                            }, this);
-                        }), this);
-                    case 25:
-                        $ctx.t15 = $ctx.sent;
-
-                        if (!($ctx.t15 != "[object Function]")) {
-                            $ctx.next = 30;
+                        if (!($ctx26.t15 != "[object Function]")) {
+                            $ctx26.next = 26;
                             break;
                         }
 
-                        $ctx.next = 29;
-
-                        return {
-                            "start": {
-                                "line": 103,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 103,
-                                "column": 56
-                            }
-                        }
-                    case 29:
                         throw new TypeError(fun + " is not a function");
-                    case 30:
-                        $ctx.next = 32;
-
-                        return {
-                            "start": {
-                                "line": 106,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 110,
-                                "column": 5
-                            }
-                        }
-                    case 32:
+                    case 26:
                         i = 0;
-                    case 33:
+                    case 27:
                         if (!(i < length)) {
-                            $ctx.next = 51;
+                            $ctx26.next = 41;
                             break;
                         }
 
-                        $ctx.next = 36;
+                        $ctx26.t16 = i in self;
 
-                        return {
-                            "start": {
-                                "line": 107,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 109,
-                                "column": 9
-                            }
-                        }
-                    case 36:
-                        $ctx.t16 = i in self;
-
-                        if (!$ctx.t16) {
-                            $ctx.next = 41;
+                        if (!$ctx26.t16) {
+                            $ctx26.next = 33;
                             break;
                         }
 
-                        $ctx.next = 40;
+                        $ctx26.next = 32;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx31) {
+                                while (1) switch ($ctx31.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(thisp, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx31.rval = fun.call(thisp, self[i], i, object);
+                                    delete $ctx31.thrown;
+                                    $ctx31.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx31.stop();
                                 }
                             }, this);
                         }), this);
-                    case 40:
-                        $ctx.t16 = !$ctx.sent;
-                    case 41:
-                        if (!$ctx.t16) {
-                            $ctx.next = 48;
+                    case 32:
+                        $ctx26.t16 = !$ctx26.sent;
+                    case 33:
+                        if (!$ctx26.t16) {
+                            $ctx26.next = 38;
                             break;
                         }
 
-                        $ctx.next = 44;
-
-                        return {
-                            "start": {
-                                "line": 108,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 108,
-                                "column": 25
-                            }
-                        }
-                    case 44:
-                        $ctx.rval = false;
-                        delete $ctx.thrown;
-                        $ctx.next = 57;
+                        $ctx26.rval = false;
+                        delete $ctx26.thrown;
+                        $ctx26.next = 45;
                         break;
-                    case 48:
+                    case 38:
                         i++;
-                        $ctx.next = 33;
+                        $ctx26.next = 27;
                         break;
-                    case 51:
-                        $ctx.next = 53;
-
-                        return {
-                            "start": {
-                                "line": 111,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 111,
-                                "column": 16
-                            }
-                        }
-                    case 53:
-                        $ctx.rval = true;
-                        delete $ctx.thrown;
-                        $ctx.next = 57;
+                    case 41:
+                        $ctx26.rval = true;
+                        delete $ctx26.thrown;
+                        $ctx26.next = 45;
                         break;
-                    case 57:
+                    case 45:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx26.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 34;
-
-            return {
-                "start": {
-                    "line": 115,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 134,
-                    "column": 2
-                }
-            }
-        case 34:
             Array.prototype.some = wrapGenerator.mark(function some(fun /*, thisp */) {
                 var object, self, length, thisp, i, $args = arguments;
 
-                return wrapGenerator(function some$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function some$($ctx32) {
+                    while (1) switch ($ctx32.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx32.next = 2;
 
                         return {
-                            "start": {
-                                "line": 116,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "some",
 
-                            "end": {
-                                "line": 121,
-                                "column": 29
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 115,
+                                        "column": 37
+                                    },
+
+                                    "end": {
+                                        "line": 115,
+                                        "column": 40
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 116,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 116,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 117,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 117,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 120,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 120,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "thisp",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 121,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 121,
+                                        "column": 13
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 128,
+                                        "column": 13
+                                    },
+
+                                    "end": {
+                                        "line": 128,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx32.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx33) {
+                                while (1) switch ($ctx33.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx33.rval = toObject(this);
+                                    delete $ctx33.thrown;
+                                    $ctx33.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx33.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t17 = splitString;
+                        object = $ctx32.sent;
+                        $ctx32.t17 = splitString;
 
-                        if (!$ctx.t17) {
-                            $ctx.next = 11;
+                        if (!$ctx32.t17) {
+                            $ctx32.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx32.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx34) {
+                                while (1) switch ($ctx34.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx34.rval = _toString(this);
+                                    delete $ctx34.thrown;
+                                    $ctx34.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx34.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t18 = $ctx.sent;
-                        $ctx.t17 = $ctx.t18 == "[object String]";
+                        $ctx32.t18 = $ctx32.sent;
+                        $ctx32.t17 = $ctx32.t18 == "[object String]";
                     case 11:
-                        if (!$ctx.t17) {
-                            $ctx.next = 17;
+                        if (!$ctx32.t17) {
+                            $ctx32.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx32.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx35) {
+                                while (1) switch ($ctx35.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx35.rval = this.split("");
+                                    delete $ctx35.thrown;
+                                    $ctx35.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx35.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t19 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx32.t19 = $ctx32.sent;
+                        $ctx32.next = 18;
                         break;
                     case 17:
-                        $ctx.t19 = object;
+                        $ctx32.t19 = object;
                     case 18:
-                        self = $ctx.t19;
+                        self = $ctx32.t19;
                         length = self.length >>> 0;
                         thisp = $args[1];
-                        $ctx.next = 23;
+                        $ctx32.next = 23;
 
-                        return {
-                            "start": {
-                                "line": 124,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 126,
-                                "column": 5
-                            }
-                        }
+                        return __thunk(wrapGenerator.mark(function thunk() {
+                            return wrapGenerator(function thunk$($ctx36) {
+                                while (1) switch ($ctx36.next) {
+                                case 0:
+                                    $ctx36.rval = _toString(fun);
+                                    delete $ctx36.thrown;
+                                    $ctx36.next = 4;
+                                    break;
+                                case 4:
+                                case "end":
+                                    return $ctx36.stop();
+                                }
+                            }, this);
+                        }), this);
                     case 23:
-                        $ctx.next = 25;
+                        $ctx32.t20 = $ctx32.sent;
 
-                        return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
-                                case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
-                                    break;
-                                case 4:
-                                case "end":
-                                    return $ctx.stop();
-                                }
-                            }, this);
-                        }), this);
-                    case 25:
-                        $ctx.t20 = $ctx.sent;
-
-                        if (!($ctx.t20 != "[object Function]")) {
-                            $ctx.next = 30;
+                        if (!($ctx32.t20 != "[object Function]")) {
+                            $ctx32.next = 26;
                             break;
                         }
 
-                        $ctx.next = 29;
-
-                        return {
-                            "start": {
-                                "line": 125,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 125,
-                                "column": 56
-                            }
-                        }
-                    case 29:
                         throw new TypeError(fun + " is not a function");
-                    case 30:
-                        $ctx.next = 32;
-
-                        return {
-                            "start": {
-                                "line": 128,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 132,
-                                "column": 5
-                            }
-                        }
-                    case 32:
+                    case 26:
                         i = 0;
-                    case 33:
+                    case 27:
                         if (!(i < length)) {
-                            $ctx.next = 51;
+                            $ctx32.next = 41;
                             break;
                         }
 
-                        $ctx.next = 36;
+                        $ctx32.t21 = i in self;
 
-                        return {
-                            "start": {
-                                "line": 129,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 131,
-                                "column": 9
-                            }
-                        }
-                    case 36:
-                        $ctx.t21 = i in self;
-
-                        if (!$ctx.t21) {
-                            $ctx.next = 41;
+                        if (!$ctx32.t21) {
+                            $ctx32.next = 33;
                             break;
                         }
 
-                        $ctx.next = 40;
+                        $ctx32.next = 32;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx37) {
+                                while (1) switch ($ctx37.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(thisp, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx37.rval = fun.call(thisp, self[i], i, object);
+                                    delete $ctx37.thrown;
+                                    $ctx37.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx37.stop();
                                 }
                             }, this);
                         }), this);
-                    case 40:
-                        $ctx.t21 = $ctx.sent;
-                    case 41:
-                        if (!$ctx.t21) {
-                            $ctx.next = 48;
+                    case 32:
+                        $ctx32.t21 = $ctx32.sent;
+                    case 33:
+                        if (!$ctx32.t21) {
+                            $ctx32.next = 38;
                             break;
                         }
 
-                        $ctx.next = 44;
-
-                        return {
-                            "start": {
-                                "line": 130,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 130,
-                                "column": 24
-                            }
-                        }
-                    case 44:
-                        $ctx.rval = true;
-                        delete $ctx.thrown;
-                        $ctx.next = 57;
+                        $ctx32.rval = true;
+                        delete $ctx32.thrown;
+                        $ctx32.next = 45;
                         break;
-                    case 48:
+                    case 38:
                         i++;
-                        $ctx.next = 33;
+                        $ctx32.next = 27;
                         break;
-                    case 51:
-                        $ctx.next = 53;
-
-                        return {
-                            "start": {
-                                "line": 133,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 133,
-                                "column": 17
-                            }
-                        }
-                    case 53:
-                        $ctx.rval = false;
-                        delete $ctx.thrown;
-                        $ctx.next = 57;
+                    case 41:
+                        $ctx32.rval = false;
+                        delete $ctx32.thrown;
+                        $ctx32.next = 45;
                         break;
-                    case 57:
+                    case 45:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx32.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 37;
-
-            return {
-                "start": {
-                    "line": 136,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 178,
-                    "column": 2
-                }
-            }
-        case 37:
             Array.prototype.reduce = wrapGenerator.mark(function reduce(fun /*, initial*/) {
                 var object, self, length, i, result, $args = arguments;
 
-                return wrapGenerator(function reduce$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function reduce$($ctx38) {
+                    while (1) switch ($ctx38.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx38.next = 2;
 
                         return {
-                            "start": {
-                                "line": 137,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "reduce",
 
-                            "end": {
-                                "line": 141,
-                                "column": 35
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 136,
+                                        "column": 41
+                                    },
+
+                                    "end": {
+                                        "line": 136,
+                                        "column": 44
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 137,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 137,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 138,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 138,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 141,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 141,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 153,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 153,
+                                        "column": 9
+                                    }
+                                }]
+                            }, {
+                                "name": "result",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 154,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 154,
+                                        "column": 14
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx38.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx39) {
+                                while (1) switch ($ctx39.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx39.rval = toObject(this);
+                                    delete $ctx39.thrown;
+                                    $ctx39.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx39.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t22 = splitString;
+                        object = $ctx38.sent;
+                        $ctx38.t22 = splitString;
 
-                        if (!$ctx.t22) {
-                            $ctx.next = 11;
+                        if (!$ctx38.t22) {
+                            $ctx38.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx38.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx40) {
+                                while (1) switch ($ctx40.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx40.rval = _toString(this);
+                                    delete $ctx40.thrown;
+                                    $ctx40.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx40.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t23 = $ctx.sent;
-                        $ctx.t22 = $ctx.t23 == "[object String]";
+                        $ctx38.t23 = $ctx38.sent;
+                        $ctx38.t22 = $ctx38.t23 == "[object String]";
                     case 11:
-                        if (!$ctx.t22) {
-                            $ctx.next = 17;
+                        if (!$ctx38.t22) {
+                            $ctx38.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx38.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx41) {
+                                while (1) switch ($ctx41.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx41.rval = this.split("");
+                                    delete $ctx41.thrown;
+                                    $ctx41.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx41.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t24 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx38.t24 = $ctx38.sent;
+                        $ctx38.next = 18;
                         break;
                     case 17:
-                        $ctx.t24 = object;
+                        $ctx38.t24 = object;
                     case 18:
-                        self = $ctx.t24;
+                        self = $ctx38.t24;
                         length = self.length >>> 0;
-                        $ctx.next = 22;
-
-                        return {
-                            "start": {
-                                "line": 144,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 146,
-                                "column": 5
-                            }
-                        }
-                    case 22:
-                        $ctx.next = 24;
+                        $ctx38.next = 22;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx42) {
+                                while (1) switch ($ctx42.next) {
                                 case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx42.rval = _toString(fun);
+                                    delete $ctx42.thrown;
+                                    $ctx42.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx42.stop();
                                 }
                             }, this);
                         }), this);
-                    case 24:
-                        $ctx.t25 = $ctx.sent;
+                    case 22:
+                        $ctx38.t25 = $ctx38.sent;
 
-                        if (!($ctx.t25 != "[object Function]")) {
-                            $ctx.next = 29;
+                        if (!($ctx38.t25 != "[object Function]")) {
+                            $ctx38.next = 25;
                             break;
                         }
 
-                        $ctx.next = 28;
-
-                        return {
-                            "start": {
-                                "line": 145,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 145,
-                                "column": 56
-                            }
-                        }
-                    case 28:
                         throw new TypeError(fun + " is not a function");
-                    case 29:
-                        $ctx.next = 31;
-
-                        return {
-                            "start": {
-                                "line": 149,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 151,
-                                "column": 5
-                            }
-                        }
-                    case 31:
+                    case 25:
                         if (!(!length && $args.length == 1)) {
-                            $ctx.next = 35;
+                            $ctx38.next = 27;
                             break;
                         }
 
-                        $ctx.next = 34;
-
-                        return {
-                            "start": {
-                                "line": 150,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 150,
-                                "column": 75
-                            }
-                        }
-                    case 34:
                         throw new TypeError("reduce of empty array with no initial value");
-                    case 35:
-                        $ctx.next = 37;
-
-                        return {
-                            "start": {
-                                "line": 153,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 153,
-                                "column": 14
-                            }
-                        }
-                    case 37:
+                    case 27:
                         i = 0;
-                        $ctx.next = 40;
 
-                        return {
-                            "start": {
-                                "line": 154,
-                                "column": 4
-                            },
+                        if (!($args.length >= 2)) {
+                            $ctx38.next = 32;
+                            break;
+                        }
 
-                            "end": {
-                                "line": 154,
-                                "column": 15
-                            }
+                        result = $args[1];
+                        $ctx38.next = 40;
+                        break;
+                    case 32:
+                        if (!(i in self)) {
+                            $ctx38.next = 37;
+                            break;
+                        }
+
+                        result = self[i++];
+                        delete $ctx38.thrown;
+                        $ctx38.next = 40;
+                        break;
+                    case 37:
+                        if (!(++i >= length)) {
+                            $ctx38.next = 39;
+                            break;
+                        }
+
+                        throw new TypeError("reduce of empty array with no initial value");
+                    case 39:
+                        if (true) {
+                            $ctx38.next = 32;
+                            break;
                         }
                     case 40:
-                        $ctx.next = 42;
-
-                        return {
-                            "start": {
-                                "line": 155,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 169,
-                                "column": 5
-                            }
-                        }
-                    case 42:
-                        if (!($args.length >= 2)) {
-                            $ctx.next = 48;
-                            break;
-                        }
-
-                        $ctx.next = 45;
-
-                        return {
-                            "start": {
-                                "line": 156,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 156,
-                                "column": 30
-                            }
-                        }
-                    case 45:
-                        result = $args[1];
-                        $ctx.next = 68;
-                        break;
-                    case 48:
-                        $ctx.next = 50;
-
-                        return {
-                            "start": {
-                                "line": 158,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 168,
-                                "column": 23
-                            }
-                        }
-                    case 50:
-                        $ctx.next = 52;
-
-                        return {
-                            "start": {
-                                "line": 159,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 162,
-                                "column": 13
-                            }
-                        }
-                    case 52:
-                        if (!(i in self)) {
-                            $ctx.next = 61;
-                            break;
-                        }
-
-                        $ctx.next = 55;
-
-                        return {
-                            "start": {
-                                "line": 160,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 160,
-                                "column": 35
-                            }
-                        }
-                    case 55:
-                        result = self[i++];
-                        $ctx.next = 58;
-
-                        return {
-                            "start": {
-                                "line": 161,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 161,
-                                "column": 22
-                            }
-                        }
-                    case 58:
-                        delete $ctx.thrown;
-                        $ctx.next = 68;
-                        break;
-                    case 61:
-                        $ctx.next = 63;
-
-                        return {
-                            "start": {
-                                "line": 165,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 167,
-                                "column": 13
-                            }
-                        }
-                    case 63:
-                        if (!(++i >= length)) {
-                            $ctx.next = 67;
-                            break;
-                        }
-
-                        $ctx.next = 66;
-
-                        return {
-                            "start": {
-                                "line": 166,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 166,
-                                "column": 83
-                            }
-                        }
-                    case 66:
-                        throw new TypeError("reduce of empty array with no initial value");
-                    case 67:
-                        if (true) {
-                            $ctx.next = 50;
-                            break;
-                        }
-                    case 68:
-                        $ctx.next = 70;
-
-                        return {
-                            "start": {
-                                "line": 171,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 175,
-                                "column": 5
-                            }
-                        }
-                    case 70:
                         if (!(i < length)) {
-                            $ctx.next = 82;
+                            $ctx38.next = 48;
                             break;
                         }
 
-                        $ctx.next = 73;
-
-                        return {
-                            "start": {
-                                "line": 172,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 174,
-                                "column": 9
-                            }
-                        }
-                    case 73:
                         if (!(i in self)) {
-                            $ctx.next = 79;
+                            $ctx38.next = 45;
                             break;
                         }
 
-                        $ctx.next = 76;
-
-                        return {
-                            "start": {
-                                "line": 173,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 173,
-                                "column": 66
-                            }
-                        }
-                    case 76:
-                        $ctx.next = 78;
+                        $ctx38.next = 44;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx43) {
+                                while (1) switch ($ctx43.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(void 0, result, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx43.rval = fun.call(void 0, result, self[i], i, object);
+                                    delete $ctx43.thrown;
+                                    $ctx43.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx43.stop();
                                 }
                             }, this);
                         }), this);
-                    case 78:
-                        result = $ctx.sent;
-                    case 79:
+                    case 44:
+                        result = $ctx38.sent;
+                    case 45:
                         i++;
-                        $ctx.next = 70;
+                        $ctx38.next = 40;
                         break;
-                    case 82:
-                        $ctx.next = 84;
-
-                        return {
-                            "start": {
-                                "line": 177,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 177,
-                                "column": 18
-                            }
-                        }
-                    case 84:
-                        $ctx.rval = result;
-                        delete $ctx.thrown;
-                        $ctx.next = 88;
+                    case 48:
+                        $ctx38.rval = result;
+                        delete $ctx38.thrown;
+                        $ctx38.next = 52;
                         break;
-                    case 88:
+                    case 52:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx38.stop();
                     }
                 }, this);
             });
 
-            $ctx.next = 40;
-
-            return {
-                "start": {
-                    "line": 181,
-                    "column": 0
-                },
-
-                "end": {
-                    "line": 226,
-                    "column": 2
-                }
-            }
-        case 40:
             Array.prototype.reduceRight = wrapGenerator.mark(function reduceRight(fun /*, initial*/) {
                 var object, self, length, result, i, $args = arguments;
 
-                return wrapGenerator(function reduceRight$($ctx) {
-                    while (1) switch ($ctx.next) {
+                return wrapGenerator(function reduceRight$($ctx44) {
+                    while (1) switch ($ctx44.next) {
                     case 0:
-                        $ctx.next = 2;
+                        $ctx44.next = 2;
 
                         return {
-                            "start": {
-                                "line": 182,
-                                "column": 4
-                            },
+                            "type": "stackFrame",
+                            "filename": "array.js",
+                            "name": "reduceRight",
 
-                            "end": {
-                                "line": 186,
-                                "column": 35
+                            "scope": [{
+                                "name": "fun",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 181,
+                                        "column": 51
+                                    },
+
+                                    "end": {
+                                        "line": 181,
+                                        "column": 54
+                                    }
+                                }]
+                            }, {
+                                "name": "object",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 182,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 182,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "self",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 183,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 183,
+                                        "column": 12
+                                    }
+                                }]
+                            }, {
+                                "name": "length",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 186,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 186,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "result",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 198,
+                                        "column": 8
+                                    },
+
+                                    "end": {
+                                        "line": 198,
+                                        "column": 14
+                                    }
+                                }]
+                            }, {
+                                "name": "i",
+
+                                "locs": [{
+                                    "start": {
+                                        "line": 198,
+                                        "column": 16
+                                    },
+
+                                    "end": {
+                                        "line": 198,
+                                        "column": 17
+                                    }
+                                }]
+                            }],
+
+                            "evalInScope": function(expr) {
+                                return eval(expr);
                             }
                         }
                     case 2:
-                        $ctx.next = 4;
+                        $ctx44.next = 4;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx45) {
+                                while (1) switch ($ctx45.next) {
                                 case 0:
-                                    $ctx.rval = toObject(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx45.rval = toObject(this);
+                                    delete $ctx45.thrown;
+                                    $ctx45.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx45.stop();
                                 }
                             }, this);
                         }), this);
                     case 4:
-                        object = $ctx.sent;
-                        $ctx.t26 = splitString;
+                        object = $ctx44.sent;
+                        $ctx44.t26 = splitString;
 
-                        if (!$ctx.t26) {
-                            $ctx.next = 11;
+                        if (!$ctx44.t26) {
+                            $ctx44.next = 11;
                             break;
                         }
 
-                        $ctx.next = 9;
+                        $ctx44.next = 9;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx46) {
+                                while (1) switch ($ctx46.next) {
                                 case 0:
-                                    $ctx.rval = _toString(this);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx46.rval = _toString(this);
+                                    delete $ctx46.thrown;
+                                    $ctx46.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx46.stop();
                                 }
                             }, this);
                         }), this);
                     case 9:
-                        $ctx.t27 = $ctx.sent;
-                        $ctx.t26 = $ctx.t27 == "[object String]";
+                        $ctx44.t27 = $ctx44.sent;
+                        $ctx44.t26 = $ctx44.t27 == "[object String]";
                     case 11:
-                        if (!$ctx.t26) {
-                            $ctx.next = 17;
+                        if (!$ctx44.t26) {
+                            $ctx44.next = 17;
                             break;
                         }
 
-                        $ctx.next = 14;
+                        $ctx44.next = 14;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx47) {
+                                while (1) switch ($ctx47.next) {
                                 case 0:
-                                    $ctx.rval = this.split("");
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx47.rval = this.split("");
+                                    delete $ctx47.thrown;
+                                    $ctx47.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx47.stop();
                                 }
                             }, this);
                         }), this);
                     case 14:
-                        $ctx.t28 = $ctx.sent;
-                        $ctx.next = 18;
+                        $ctx44.t28 = $ctx44.sent;
+                        $ctx44.next = 18;
                         break;
                     case 17:
-                        $ctx.t28 = object;
+                        $ctx44.t28 = object;
                     case 18:
-                        self = $ctx.t28;
+                        self = $ctx44.t28;
                         length = self.length >>> 0;
-                        $ctx.next = 22;
-
-                        return {
-                            "start": {
-                                "line": 189,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 191,
-                                "column": 5
-                            }
-                        }
-                    case 22:
-                        $ctx.next = 24;
+                        $ctx44.next = 22;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx48) {
+                                while (1) switch ($ctx48.next) {
                                 case 0:
-                                    $ctx.rval = _toString(fun);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx48.rval = _toString(fun);
+                                    delete $ctx48.thrown;
+                                    $ctx48.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx48.stop();
                                 }
                             }, this);
                         }), this);
-                    case 24:
-                        $ctx.t29 = $ctx.sent;
+                    case 22:
+                        $ctx44.t29 = $ctx44.sent;
 
-                        if (!($ctx.t29 != "[object Function]")) {
-                            $ctx.next = 29;
+                        if (!($ctx44.t29 != "[object Function]")) {
+                            $ctx44.next = 25;
                             break;
                         }
 
-                        $ctx.next = 28;
-
-                        return {
-                            "start": {
-                                "line": 190,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 190,
-                                "column": 56
-                            }
-                        }
-                    case 28:
                         throw new TypeError(fun + " is not a function");
-                    case 29:
-                        $ctx.next = 31;
-
-                        return {
-                            "start": {
-                                "line": 194,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 196,
-                                "column": 5
-                            }
-                        }
-                    case 31:
+                    case 25:
                         if (!(!length && $args.length == 1)) {
-                            $ctx.next = 35;
+                            $ctx44.next = 27;
                             break;
                         }
 
-                        $ctx.next = 34;
-
-                        return {
-                            "start": {
-                                "line": 195,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 195,
-                                "column": 80
-                            }
-                        }
-                    case 34:
                         throw new TypeError("reduceRight of empty array with no initial value");
-                    case 35:
-                        $ctx.next = 37;
-
-                        return {
-                            "start": {
-                                "line": 198,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 198,
-                                "column": 31
-                            }
-                        }
-                    case 37:
+                    case 27:
                         i = length - 1;
-                        $ctx.next = 40;
 
-                        return {
-                            "start": {
-                                "line": 199,
-                                "column": 4
-                            },
+                        if (!($args.length >= 2)) {
+                            $ctx44.next = 32;
+                            break;
+                        }
 
-                            "end": {
-                                "line": 213,
-                                "column": 5
-                            }
+                        result = $args[1];
+                        $ctx44.next = 40;
+                        break;
+                    case 32:
+                        if (!(i in self)) {
+                            $ctx44.next = 37;
+                            break;
+                        }
+
+                        result = self[i--];
+                        delete $ctx44.thrown;
+                        $ctx44.next = 40;
+                        break;
+                    case 37:
+                        if (!(--i < 0)) {
+                            $ctx44.next = 39;
+                            break;
+                        }
+
+                        throw new TypeError("reduceRight of empty array with no initial value");
+                    case 39:
+                        if (true) {
+                            $ctx44.next = 32;
+                            break;
                         }
                     case 40:
-                        if (!($args.length >= 2)) {
-                            $ctx.next = 46;
-                            break;
-                        }
-
-                        $ctx.next = 43;
-
-                        return {
-                            "start": {
-                                "line": 200,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 200,
-                                "column": 30
-                            }
-                        }
-                    case 43:
-                        result = $args[1];
-                        $ctx.next = 66;
-                        break;
-                    case 46:
-                        $ctx.next = 48;
-
-                        return {
-                            "start": {
-                                "line": 202,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 212,
-                                "column": 23
-                            }
-                        }
-                    case 48:
-                        $ctx.next = 50;
-
-                        return {
-                            "start": {
-                                "line": 203,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 206,
-                                "column": 13
-                            }
-                        }
-                    case 50:
-                        if (!(i in self)) {
-                            $ctx.next = 59;
-                            break;
-                        }
-
-                        $ctx.next = 53;
-
-                        return {
-                            "start": {
-                                "line": 204,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 204,
-                                "column": 35
-                            }
-                        }
-                    case 53:
-                        result = self[i--];
-                        $ctx.next = 56;
-
-                        return {
-                            "start": {
-                                "line": 205,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 205,
-                                "column": 22
-                            }
-                        }
-                    case 56:
-                        delete $ctx.thrown;
-                        $ctx.next = 66;
-                        break;
-                    case 59:
-                        $ctx.next = 61;
-
-                        return {
-                            "start": {
-                                "line": 209,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 211,
-                                "column": 13
-                            }
-                        }
-                    case 61:
-                        if (!(--i < 0)) {
-                            $ctx.next = 65;
-                            break;
-                        }
-
-                        $ctx.next = 64;
-
-                        return {
-                            "start": {
-                                "line": 210,
-                                "column": 16
-                            },
-
-                            "end": {
-                                "line": 210,
-                                "column": 88
-                            }
-                        }
-                    case 64:
-                        throw new TypeError("reduceRight of empty array with no initial value");
-                    case 65:
-                        if (true) {
-                            $ctx.next = 48;
-                            break;
-                        }
-                    case 66:
-                        $ctx.next = 68;
-
-                        return {
-                            "start": {
-                                "line": 215,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 217,
-                                "column": 5
-                            }
-                        }
-                    case 68:
                         if (!(i < 0)) {
-                            $ctx.next = 75;
+                            $ctx44.next = 45;
                             break;
                         }
 
-                        $ctx.next = 71;
-
-                        return {
-                            "start": {
-                                "line": 216,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 216,
-                                "column": 22
-                            }
-                        }
-                    case 71:
-                        $ctx.rval = result;
-                        delete $ctx.thrown;
-                        $ctx.next = 92;
+                        $ctx44.rval = result;
+                        delete $ctx44.thrown;
+                        $ctx44.next = 54;
                         break;
-                    case 75:
-                        $ctx.next = 77;
-
-                        return {
-                            "start": {
-                                "line": 219,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 223,
-                                "column": 18
-                            }
-                        }
-                    case 77:
-                        $ctx.next = 79;
-
-                        return {
-                            "start": {
-                                "line": 220,
-                                "column": 8
-                            },
-
-                            "end": {
-                                "line": 222,
-                                "column": 9
-                            }
-                        }
-                    case 79:
+                    case 45:
                         if (!(i in this)) {
-                            $ctx.next = 85;
+                            $ctx44.next = 49;
                             break;
                         }
 
-                        $ctx.next = 82;
-
-                        return {
-                            "start": {
-                                "line": 221,
-                                "column": 12
-                            },
-
-                            "end": {
-                                "line": 221,
-                                "column": 66
-                            }
-                        }
-                    case 82:
-                        $ctx.next = 84;
+                        $ctx44.next = 48;
 
                         return __thunk(wrapGenerator.mark(function thunk() {
-                            return wrapGenerator(function thunk$($ctx) {
-                                while (1) switch ($ctx.next) {
+                            return wrapGenerator(function thunk$($ctx49) {
+                                while (1) switch ($ctx49.next) {
                                 case 0:
-                                    $ctx.rval = fun.call(void 0, result, self[i], i, object);
-                                    delete $ctx.thrown;
-                                    $ctx.next = 4;
+                                    $ctx49.rval = fun.call(void 0, result, self[i], i, object);
+                                    delete $ctx49.thrown;
+                                    $ctx49.next = 4;
                                     break;
                                 case 4:
                                 case "end":
-                                    return $ctx.stop();
+                                    return $ctx49.stop();
                                 }
                             }, this);
                         }), this);
-                    case 84:
-                        result = $ctx.sent;
-                    case 85:
+                    case 48:
+                        result = $ctx44.sent;
+                    case 49:
                         if (i--) {
-                            $ctx.next = 77;
+                            $ctx44.next = 45;
                             break;
                         }
-                    case 86:
-                        $ctx.next = 88;
-
-                        return {
-                            "start": {
-                                "line": 225,
-                                "column": 4
-                            },
-
-                            "end": {
-                                "line": 225,
-                                "column": 18
-                            }
-                        }
-                    case 88:
-                        $ctx.rval = result;
-                        delete $ctx.thrown;
-                        $ctx.next = 92;
+                    case 50:
+                        $ctx44.rval = result;
+                        delete $ctx44.thrown;
+                        $ctx44.next = 54;
                         break;
-                    case 92:
+                    case 54:
                     case "end":
-                        return $ctx.stop();
+                        return $ctx44.stop();
                     }
                 }, this);
             });
-        case 41:
+        case 19:
         case "end":
-            return $ctx.stop();
+            return $ctx1.stop();
         }
     }, this);
 }

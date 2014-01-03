@@ -4,6 +4,6 @@ browserify:
 
 runtime:
 	@echo building runtime
-	@bin/transform ./runtime/source/array.js -x ./runtime/compiled/array.js
+	@bin/transform -x ./runtime/source/array.js > ./runtime/compiled/array.js
 
 .PHONY: runtime

@@ -12,8 +12,9 @@ program
   .option('-x, --exclude-steps', 'exclude generating yield statements for debugging')
   .parse(process.argv);
 
-var source = fs.readFileSync(process.argv[2]).toString();
-var filename = path.basename(process.argv[2]);
+var file = process.argv[process.argv.length - 1];
+var source = fs.readFileSync(file).toString();
+var filename = path.basename(file);
 
 var transformedCode = recast.print(
   transform(recast.parse(source), {
