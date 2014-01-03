@@ -193,217 +193,216 @@ describe('Debugger#run', function () {
         scope: []
       }]
     });
- });
-
-  describe('Debugger#stepOver', function () {
-
-    it('should step over function calls', function (done) {
-      var source = fnString(function () {
-        function foo() {
-          report('foo');
-        }
-        foo();
-        report('done');
-      });
-
-      var i = 0;
-      var machine = new Machine({
-        report: function (arg) {
-          if (!i) {
-            assert.equal(arg, 'foo');
-          } else {
-            assert.equal(arg, 'done');
-            done();
-          }
-          i++;
-        }
-      });
-      machine.evaluate(source);
-      var debuggr = new Debugger(machine);
-      // function foo
-      debuggr.stepOver();
-      // foo()
-      debuggr.stepOver();
-      // report()
-      debuggr.stepOver();
-
-      // Make sure it steps until it's halted.
-      while (!machine.halted) {
-        debuggr.stepOver();
-      }
-    });
-
-    it('should handle breakpoints while steping over', function () {
-      var source = fnString(function () {
-        function foo() {
-          report(1);
-          report(2);
-          report(3);
-        }
-        foo();
-        report(4);
-        report('will never happen');
-      });
-
-      var i = 0;
-      var machine = new Machine({
-        report: function (arg) {
-          assert.equal(arg, ++i);
-        }
-      });
-      machine.evaluate(source, 'foo');
-      var debuggr = new Debugger(machine);
-      debuggr.addBreakpoints('foo', [4]);
-      // function foo
-      debuggr.stepOver();
-      // foo ()
-      debuggr.stepOver();
-      // Paused on 3
-      assert.equal(i, 2);
-    });
-
-    it('should step out when the function ends', function () {
-      var source = fnString(function () {
-        function foo() {
-          report(1);
-          report(2);
-          report(3);
-        }
-        foo();
-        report(4);
-        report('will never happen');
-      });
-
-      var i = 0;
-      var machine = new Machine({
-        report: function (arg) {
-          assert.equal(arg, ++i);
-        }
-      });
-      machine.evaluate(source, 'foo');
-      var debuggr = new Debugger(machine);
-      debuggr.addBreakpoints('foo', [4]);
-      // function foo
-      debuggr.stepOver();
-      // foo ()
-      debuggr.stepOver();
-      // report(3)
-      debuggr.stepOver();
-      // report(4)
-      debuggr.stepOver();
-      assert.equal(i, 4);
-    });
-
   });
+});
 
-  describe('Debugger#stepIn', function () {
+describe('Debugger#stepOver', function () {
 
-    it('should step into function calls', function () {
-      var source = fnString(function () {
-        function foo() {
-          report('foo');
-        }
-        foo();
-      });
+  it('should step over function calls', function (done) {
+    var source = fnString(function () {
+      function foo() {
+        report('foo');
+      }
+      foo();
+      report('done');
+    });
 
-      var called = false;
-      var machine = new Machine({
-        report: function (arg) {
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        if (!i) {
           assert.equal(arg, 'foo');
-          called = true;
+        } else {
+          assert.equal(arg, 'done');
+          done();
         }
-      });
-      machine.evaluate(source);
-      var debuggr = new Debugger(machine);
-      // function foo
-      debuggr.stepIn();
-      // foo ()
-      debuggr.stepIn();
-      // report('foo')
-      debuggr.stepIn();
-      assert(called);
-
-      // Make sure it steps until it's halted.
-      while (!machine.halted) {
-        debuggr.stepIn();
+        i++;
       }
     });
+    machine.evaluate(source);
+    var debuggr = new Debugger(machine);
+    // function foo
+    debuggr.stepOver();
+    // foo()
+    debuggr.stepOver();
+    // report()
+    debuggr.stepOver();
 
+    // Make sure it steps until it's halted.
+    while (!machine.halted) {
+      debuggr.stepOver();
+    }
   });
 
-
-  describe('Debugger#stepOut', function () {
-
-    it('should step out of function calls', function () {
-      var source = fnString(function () {
-        function foo() {
-          report(1);
-          report(2);
-          report(3);
-        }
-        foo();
-        report(4);
-        report('will never happen');
-      });
-
-      var i = 0;
-      var machine = new Machine({
-        report: function (arg) {
-          assert.equal(arg, ++i);
-        }
-      });
-      machine.evaluate(source);
-      var debuggr = new Debugger(machine);
-      // function foo
-      debuggr.stepOver();
-      // foo ()
-      debuggr.stepIn();
-      // report(1)
-      debuggr.stepOver();
-      // report(2)
-      debuggr.stepOut();
-      // report(4)
-      debuggr.stepOver();
-      assert.equal(i, 4);
+  it('should handle breakpoints while steping over', function () {
+    var source = fnString(function () {
+      function foo() {
+        report(1);
+        report(2);
+        report(3);
+      }
+      foo();
+      report(4);
+      report('will never happen');
     });
 
-    it('should handle breakpoints while steping out', function () {
-      var source = fnString(function () {
-        function foo() {
-          report(1);
-          report(2);
-          report(3);
-        }
-        foo();
-        report(4);
-        report('will never happen');
-      });
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source, 'foo');
+    var debuggr = new Debugger(machine);
+    debuggr.addBreakpoints('foo', [4]);
+    // function foo
+    debuggr.stepOver();
+    // foo ()
+    debuggr.stepOver();
+    // Paused on 3
+    assert.equal(i, 2);
+  });
 
-      var i = 0;
-      var machine = new Machine({
-        report: function (arg) {
-          assert.equal(arg, ++i);
-        }
-      });
-      machine.evaluate(source, 'foo');
-      var debuggr = new Debugger(machine);
-      debuggr.addBreakpoints('foo', [4]);
-      // function foo
-      debuggr.stepOver();
-      // foo ()
-      debuggr.stepIn();
-      // report(1)
-      debuggr.stepOver();
-      // report(2)
-      debuggr.stepOut();
-      // Paused on 3
-      assert.equal(i, 2);
+  it('should step out when the function ends', function () {
+    var source = fnString(function () {
+      function foo() {
+        report(1);
+        report(2);
+        report(3);
+      }
+      foo();
+      report(4);
+      report('will never happen');
     });
 
-
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source, 'foo');
+    var debuggr = new Debugger(machine);
+    debuggr.addBreakpoints('foo', [4]);
+    // function foo
+    debuggr.stepOver();
+    // foo ()
+    debuggr.stepOver();
+    // report(3)
+    debuggr.stepOver();
+    // report(4)
+    debuggr.stepOver();
+    assert.equal(i, 4);
   });
 
 });
+
+describe('Debugger#stepIn', function () {
+
+  it('should step into function calls', function () {
+    var source = fnString(function () {
+      function foo() {
+        report('foo');
+      }
+      foo();
+    });
+
+    var called = false;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, 'foo');
+        called = true;
+      }
+    });
+    machine.evaluate(source);
+    var debuggr = new Debugger(machine);
+    // function foo
+    debuggr.stepIn();
+    // foo ()
+    debuggr.stepIn();
+    // report('foo')
+    debuggr.stepIn();
+    assert(called);
+
+    // Make sure it steps until it's halted.
+    while (!machine.halted) {
+      debuggr.stepIn();
+    }
+  });
+
+});
+
+
+describe('Debugger#stepOut', function () {
+
+  it('should step out of function calls', function () {
+    var source = fnString(function () {
+      function foo() {
+        report(1);
+        report(2);
+        report(3);
+      }
+      foo();
+      report(4);
+      report('will never happen');
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source);
+    var debuggr = new Debugger(machine);
+    // function foo
+    debuggr.stepOver();
+    // foo ()
+    debuggr.stepIn();
+    // report(1)
+    debuggr.stepOver();
+    // report(2)
+    debuggr.stepOut();
+    // report(4)
+    debuggr.stepOver();
+    assert.equal(i, 4);
+  });
+
+  it('should handle breakpoints while steping out', function () {
+    var source = fnString(function () {
+      function foo() {
+        report(1);
+        report(2);
+        report(3);
+      }
+      foo();
+      report(4);
+      report('will never happen');
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source, 'foo');
+    var debuggr = new Debugger(machine);
+    debuggr.addBreakpoints('foo', [4]);
+    // function foo
+    debuggr.stepOver();
+    // foo ()
+    debuggr.stepIn();
+    // report(1)
+    debuggr.stepOver();
+    // report(2)
+    debuggr.stepOut();
+    // Paused on 3
+    assert.equal(i, 2);
+  });
+
+});
+
 
 describe('debugger statement', function () {
   it('should pause and emit on debugger statement', function (done) {
