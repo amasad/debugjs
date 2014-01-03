@@ -1,4 +1,3 @@
 add function end debug statement
 work on timers and event runtime
 test component.js
-use regenerator ast transform.
