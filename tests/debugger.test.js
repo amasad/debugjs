@@ -362,7 +362,7 @@ describe('Debugger#run', function () {
       debuggr.stepOver();
       // report(2)
       debuggr.stepOut();
-      // report(3)
+      // report(4)
       debuggr.stepOver();
       assert.equal(i, 4);
     });
