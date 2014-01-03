@@ -1,6 +1,4 @@
 A line with two functions, stepping into then out of one will break shit;
-when debugger statement is in the first line it ignores the pause.
-undefined in call stack
 when stepping out, should return to the same line
 add function end debug statement
 remove yields from runtime

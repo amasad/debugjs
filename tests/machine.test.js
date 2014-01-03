@@ -548,7 +548,7 @@ describe('Machine#getCallStack', function () {
     // call fn3
     machine.step();
     // TODO take care of undefined.
-    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope, undefined]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
     var fn1Scope = {
       type: 'stackFrame',
@@ -565,7 +565,7 @@ describe('Machine#getCallStack', function () {
     machine.step();
     // TODO take care of undefined.
     assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [
-      globalScope, fn1Scope, undefined
+      globalScope, fn1Scope
     ]);
 
     var fn2Scope = {
