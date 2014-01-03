@@ -429,6 +429,58 @@ describe('Debugger#stepOut', function () {
     assert.equal(i, 2);
   });
 
+  it('should stepin and out functions within the same statment wat', function () {
+    var source = fnString(function () {
+      function foo() {
+        (function () {
+          2;
+        })();
+        report(1);
+        return true;
+      }
+      function bar() {
+        report(2);
+        return true;
+      }
+      function baz() {
+        report(3);
+        (function () {
+          1;
+        })();
+        return true;
+      }
+      foo() && bar() && baz();
+      report('will never happen');
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source, 'foo');
+    var debuggr = new Debugger(machine);
+    debuggr.machine.step();
+    // function foo
+    debuggr.stepOver();
+    // function bar
+    debuggr.stepOver();
+    // function baz
+    debuggr.stepOver();
+    // foo() && bar() && baz()
+    debuggr.stepIn();
+    debuggr.stepOut();
+    assert.equal(i, 1);
+    // foo() && bar() && baz()
+    debuggr.stepIn();
+    debuggr.stepOut();
+    assert.equal(i, 2);
+    // foo() && bar() && baz()
+    debuggr.stepOver();
+    assert.equal(i, 3);
+  });
+
 });
 
 
