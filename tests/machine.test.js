@@ -513,7 +513,7 @@ describe('Machine#getCallStack', function () {
 
     function nullifyEvalInscope(stack) {
       return stack.map(function (frame) {
-        if (frame) frame.evalInScope = null;
+        if (frame && frame.evalInScope) frame.evalInScope = null;
         return frame;
       });
     };
@@ -522,6 +522,7 @@ describe('Machine#getCallStack', function () {
 
     machine.evaluate(source, 'testFile');
 
+    var functionCall = { type: 'functionCall' };
     var globalScope = {
       type: 'stackFrame',
       filename: 'testFile',
@@ -541,14 +542,13 @@ describe('Machine#getCallStack', function () {
     machine.step();
     assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
-    // fn3()
+    // fn1()
     machine.step();
     assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
 
-    // call fn3
+    // call fn1
     machine.step();
-    // TODO take care of undefined.
-    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope]);
+    assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [globalScope, functionCall]);
 
     var fn1Scope = {
       type: 'stackFrame',
@@ -565,7 +565,7 @@ describe('Machine#getCallStack', function () {
     machine.step();
     // TODO take care of undefined.
     assert.deepEqual(nullifyEvalInscope(machine.getCallStack()), [
-      globalScope, fn1Scope
+      globalScope, fn1Scope, functionCall
     ]);
 
     var fn2Scope = {
