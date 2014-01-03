@@ -1,4 +1,3 @@
-stepover doesn't work as last statement.
 A line with two functions, stepping into then out of one will break shit;
 when debugger statement is in the first line it ignores the pause.
 undefined in call stack

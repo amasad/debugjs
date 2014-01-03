@@ -194,6 +194,28 @@ describe('Debugger#run', function () {
       }]
     });
   });
+
+
+  it('should break on first line', function () {
+    var source = fnString(function () {
+      report(1);
+      report(2);
+      report('never');
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+      }
+    });
+    machine.evaluate(source, 'foo');
+    var debuggr = new Debugger(machine);
+    debuggr.addBreakpoints('foo', [1]);
+    debuggr.run();
+    assert.equal(i, 0);
+  });
+
 });
 
 describe('Debugger#stepOver', function () {
@@ -221,6 +243,7 @@ describe('Debugger#stepOver', function () {
     });
     machine.evaluate(source);
     var debuggr = new Debugger(machine);
+    debuggr.machine.step();
     // function foo
     debuggr.stepOver();
     // foo()
@@ -255,6 +278,7 @@ describe('Debugger#stepOver', function () {
     machine.evaluate(source, 'foo');
     var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [4]);
+    debuggr.machine.step();
     // function foo
     debuggr.stepOver();
     // foo ()
@@ -284,6 +308,7 @@ describe('Debugger#stepOver', function () {
     machine.evaluate(source, 'foo');
     var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [4]);
+    debuggr.machine.step();
     // function foo
     debuggr.stepOver();
     // foo ()
@@ -316,6 +341,7 @@ describe('Debugger#stepIn', function () {
     });
     machine.evaluate(source);
     var debuggr = new Debugger(machine);
+    debuggr.machine.step();
     // function foo
     debuggr.stepIn();
     // foo ()
@@ -355,6 +381,7 @@ describe('Debugger#stepOut', function () {
     });
     machine.evaluate(source);
     var debuggr = new Debugger(machine);
+    debuggr.machine.step();
     // function foo
     debuggr.stepOver();
     // foo ()
@@ -389,6 +416,7 @@ describe('Debugger#stepOut', function () {
     machine.evaluate(source, 'foo');
     var debuggr = new Debugger(machine);
     debuggr.addBreakpoints('foo', [4]);
+    debuggr.machine.step();
     // function foo
     debuggr.stepOver();
     // foo ()
