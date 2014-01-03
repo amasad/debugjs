@@ -759,3 +759,34 @@ describe('debugger statements', function () {
   });
 
 });
+
+describe('Machine#getCurrentLoc', function () {
+  it('should get the location', function () {
+    var source = fnString(function () {
+      function foo() {
+        return true;
+      }
+      foo();
+
+    });
+    var machine = new Machine();
+    machine.evaluate(source);
+    machine.step();
+    assert.deepEqual(machine.getCurrentLoc(), {
+      start: { line: 1, column: 0 }, end: { line: 3, column: 1 }
+    });
+    machine.step();
+    assert.deepEqual(machine.getCurrentLoc(), {
+      start: { line: 4, column: 0 }, end: { line: 4, column: 6 }
+    });
+    machine.step();
+    machine.step();
+    assert.deepEqual(machine.getCurrentLoc(), {
+      start: { line: 2, column: 0 }, end: { line: 2, column: 12 }
+    });
+    machine.step();
+    assert.deepEqual(machine.getCurrentLoc(), {
+      start: { line: 4, column: 0 }, end: { line: 4, column: 6 }
+    });
+  });
+});
