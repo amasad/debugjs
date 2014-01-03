@@ -1,14 +1,25 @@
 #!/usr/bin/env node
 
 var fs = require('fs');
+var path = require('path');
 var transform = require('../lib/transform');
 var recast = require('recast');
 var regenerator = require('regenerator');
 
+var program = require('commander');
+
+program
+  .option('-x, --exclude-steps', 'exclude generating yield statements for debugging')
+  .parse(process.argv);
+
 var source = fs.readFileSync(process.argv[2]).toString();
+var filename = path.basename(process.argv[2]);
 
 var transformedCode = recast.print(
-  transform(recast.parse(source))
+  transform(recast.parse(source), {
+    filename: filename,
+    excludeSteps: program.excludeSteps
+  })
 ).code;
 
 process.stdout.write(regenerator(transformedCode));

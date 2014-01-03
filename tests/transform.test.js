@@ -59,7 +59,7 @@ describe('non functions', function () {
 
   it('should convert toplevel program into a toplevel generator', function () {
     var code = 'console.log(1);';
-    var ast = transform(recast.parse(code), 'testFile');
+    var ast = transform(recast.parse(code), { filename: 'testFile' });
     assert(ast.program.body[0].generator);
   });
 
@@ -234,7 +234,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should do right by for loops', function () {
@@ -322,7 +322,7 @@ describe('non functions', function () {
         }
       })
     );
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should do right by for in loops', function () {
@@ -412,7 +412,7 @@ describe('non functions', function () {
         }
       })
     );
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should do right by loops with complex expressions', function () {
@@ -540,7 +540,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should work with while loops', function () {
@@ -635,7 +635,7 @@ describe('non functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 });
 
@@ -784,7 +784,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should convert function declerations to generators', function () {
@@ -871,7 +871,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should convert function expressions to generators', function () {
@@ -957,7 +957,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should *thunkify and yield function calls', function () {
@@ -1062,7 +1062,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   it('should *thunkify and yield nested function calls wat', function () {
@@ -1298,7 +1298,7 @@ describe('functions', function () {
       })
     );
 
-    assertEqualsAST(transform(source, 'testFile'), expected);
+    assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
   });
 
   describe('debugger statements', function () {
@@ -1379,9 +1379,40 @@ describe('functions', function () {
         })
       );
 
-      assertEqualsAST(transform(source, 'testFile'), expected);
+      assertEqualsAST(transform(source, { filename: 'testFile' }), expected);
     });
 
   });
 
+  describe('exclude steps', function () {
+      var source = parse(
+        fnString(function () {
+          1;
+          2;
+        })
+      );
+      var expected = parse(
+        fnString(function () {
+          function* __top() {
+            yield {
+              "type": "stackFrame",
+              "filename": "testFile",
+              "name": "Global Scope",
+              "scope": [],
+
+              "evalInScope": function(expr) {
+                return eval(expr);
+              }
+            };
+
+            1;
+            2;
+          }
+        })
+      );
+      assertEqualsAST(
+        transform(source, { filename: 'testFile', excludeSteps: true }),
+        expected
+      );
+  });
 });

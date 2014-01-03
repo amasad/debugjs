@@ -15,7 +15,8 @@
     "context-eval": "0.0.2",
     "regenerator": "~0.3.4",
     "generator-supported": "0.0.1",
-    "lodash.clonedeep": "~2.4.1"
+    "lodash.clonedeep": "~2.4.1",
+    "commander": "~2.1.0"
   },
   "devDependencies": {
     "esprima": "git://github.com/ariya/esprima.git#harmony"
