@@ -593,6 +593,18 @@ describe('Machine#getCallStack', function () {
       globalScope, fn1Scope, fn2Scope
     ]);
   });
+
+  it('stackFrame types should be from current context', function () {
+    var source = fnString(function () {
+      var x = 1;
+      var y = 2;
+    });
+    var machine = new Machine();
+    machine.evaluate(source);
+    machine.step();
+    assert(machine.getCallStack()[0].scope instanceof Array);
+  });
+
 });
 
 describe('exceptions', function () {
