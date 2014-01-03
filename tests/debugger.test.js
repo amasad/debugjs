@@ -429,7 +429,7 @@ describe('Debugger#stepOut', function () {
     assert.equal(i, 2);
   });
 
-  it('should stepin and out functions within the same statment wat', function () {
+  it('should stepin and out functions within the same statment', function () {
     var source = fnString(function () {
       function foo() {
         (function () {
