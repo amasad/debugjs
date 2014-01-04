@@ -62,7 +62,7 @@ Debugger.prototype.removeBreakpoints = function (filename, linenos) {
 };
 
 Debugger.prototype.$machineDebuggerHandler = function (step) {
-  var stack = this.machine.getCallStack();
+  var stack = this.getCallStack();
   var filename = stack[stack.length - 1].filename;
   this.$breakpointHandler({
     filename: filename,
@@ -82,7 +82,7 @@ Debugger.prototype.$step = function () {
   this.machine.step();
   var val = this.machine.getState().value;
   if (val && val.type === 'step') {
-    var stack = this.machine.getCallStack();
+    var stack = this.getCallStack();
     var filename = stack[stack.length - 1].filename;
     var fileBp = this.$breakpoints[filename];
     if (fileBp && fileBp[val.start.line]) {
@@ -96,15 +96,23 @@ Debugger.prototype.$step = function () {
   }
 };
 
-Debugger.prototype.$checkStarted = function () {
-  if (!this.machine.getCurrentStackFrame()) {
-    this.machine.step();
+Debugger.prototype.getCallStack = function (options) {
+  options = options || {};
+  if (!options.raw) {
+    return this.machine.getCallStack().filter(function (frame) {
+      if (frame.type === 'functionCall') {
+        return false;
+      } else {
+        return true;
+      }
+    });
+  } else {
+    return this.machine.getCallStack();
   }
-  this.machine.resume();
 };
 
 Debugger.prototype.run = function () {
-  this.$checkStarted();
+  this.machine.resume();
   var machine = this.machine;
   while (!machine.halted && !machine.paused) {
     this.$step();
@@ -113,18 +121,24 @@ Debugger.prototype.run = function () {
 };
 
 Debugger.prototype.stepOver = function () {
-  this.$checkStarted();
+  this.machine.resume();
   var machine = this.machine;
-  var len = this.machine.getCallStack().length;
+  var len = this.getCallStack({ raw: true }).length;
+  var state = machine.getState();
+  if (state.value && state.value.type === 'functionCall') {
+    // If we are in a thunk (a function that hasn't been called yet) we ignore
+    // it and step over.
+    len -= 1;
+  }
   do {
     this.$step();
-  } while ((this.machine.getCallStack().length > len) &&
+  } while ((this.getCallStack({ raw: true }).length > len) &&
             !machine.halted &&
             !machine.paused);
 };
 
 Debugger.prototype.stepIn = function () {
-  this.$checkStarted();
+  this.machine.resume();
   this.machine.step();
   var state = this.machine.getState();
   if (state.value && state.value.type === 'functionCall') {
@@ -132,13 +146,23 @@ Debugger.prototype.stepIn = function () {
   }
 };
 
-Debugger.prototype.stepOut = function () {
-  this.$checkStarted();
+Debugger.prototype.$stepOutCondition = function (len) {
   var machine = this.machine;
-  var stack = this.machine.getCallStack();
-  var targetFrame = stack[stack.length - 2];
-  while (this.machine.getCurrentStackFrame() !== targetFrame &&
-          !machine.paused && !machine.halted) {
+  var state = machine.getState();
+  var curLen = this.getCallStack({ raw: true }).length;
+  return curLen > len &&
+    // This is testing whether we jumped into a new function call without
+    // stepping out of our thunk stack frame. Could happen in an expression
+    // statement with two function calls.
+    !((curLen === len + 1) &&
+      state.value && state.value.type === 'functionCall') &&
+    !machine.paused && !machine.halted;
+};
+
+Debugger.prototype.stepOut = function () {
+  this.machine.resume();
+  var len = this.getCallStack({ raw: true }).length - 1;
+  while (this.$stepOutCondition(len)) {
     this.$step();
   }
 };
@@ -149,7 +173,7 @@ Debugger.prototype.load = function (code, filename) {
 
 module.exports = Debugger;
 
-},{"events":73,"util":78}],3:[function(require,module,exports){
+},{"events":119,"util":124}],3:[function(require,module,exports){
 var recast = require('recast');
 var transform = require('./transform');
 var Context = require('context-eval');
@@ -158,6 +182,7 @@ var regenerator = require('regenerator');
 var fs = require('fs');
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
+var clone = require('lodash.clonedeep');
 
 /**
  * @constructor
@@ -184,10 +209,97 @@ function createThunk(fn, thisp) {
   return new Thunk(fn, thisp);
 }
 
+function Timers() {
+  this.$q = [];
+  this.timeElapsed = 0;
+  this.$uid = 0;
+  setImmediate(this.$tick.bind(this), 0);
+}
+
+inherits(Timers, EventEmitter);
+
+Timers.prototype.$tick = function () {
+  if (this.$idleTimeStart) {
+    this.timeElapsed += Date.now() - this.$idleTimeStart;
+    this.$idleTimeStart = Date.now();
+  }
+  var timer = this.$q[0];
+  if (timer && (timer.when <= this.timeElapsed)) {
+    this.$q.shift();
+    if (timer.interval) {
+      // Need to account for lost time between calls to the first time and
+      // subsquent timers.
+      var after = timer.after - (this.timeElapsed - timer.when);
+      this.$setTimer(timer.genFn, after, timer.args, true, timer.id);
+    }
+    this.emit('timer', timer);
+  }
+  setImmediate(this.$tick.bind(this), 0);
+};
+
+Timers.prototype.$setTimer = function (genFn, after, args, isInterval, id) {
+  if (id == null) {
+    id = ++this.$uid;
+  }
+  var when = this.timeElapsed + after;
+  var q = this.$q;
+  var i;
+  for (i = 0; i < q.length; i++) {
+    if (q[i].when > when) {
+      break;
+    }
+  }
+  q.splice(i, 0, {
+    genFn: genFn,
+    after: after,
+    when: when,
+    id: id,
+    args: args,
+    interval: isInterval
+  });
+  return id;
+};
+
+Timers.prototype.setTimeout = function (genFn, after) {
+  var args = Array.prototype.slice.call(arguments, 2);
+  return this.$setTimer(genFn, after, args, false);
+};
+
+Timers.prototype.setInterval = function (genFn, after) {
+  var args = Array.prototype.slice.call(arguments, 2);
+  return this.$setTimer(genFn, after, args, true);
+};
+
+Timers.prototype.clearTimeout =
+Timers.prototype.clearInterval = function (id) {
+  var q = this.$q;
+  for (var i = 0; i < q.length; i++) {
+    if (q[i].id === id) {
+      q.splice(i, 1);
+      break;
+    }
+  }
+};
+
+Timers.prototype.step = function () {
+  this.$start = Date.now();
+};
+
+Timers.prototype.stepEnd = function (halted) {
+  this.timeElapsed += Date.now() - this.$start;
+  if (halted) {
+    this.$idleTimeStart = Date.now();
+  } else {
+    this.$idleTimeStart = null;
+  }
+};
+
 /**
  * @constructor The runner object that lives in the sandbox to run stuff.
  */
-function Runner() {}
+function Runner(timers) {
+  this.timers = timers;
+}
 
 /**
  * @param {Generator} gen The first generator in our callstack.
@@ -214,6 +326,10 @@ Runner.prototype.$propError = function (e) {
   throw e;
 };
 
+function isGen(val) {
+  return val && val.toString() === '[object Generator]';
+}
+
 /**
  * This is the main run "loop". It maintains a callstack `this.stack` and on
  * each step it will call next on the current generator `this.gen` with an
@@ -231,11 +347,24 @@ Runner.prototype.$propError = function (e) {
  * @param {*} val The value of the yield expression to pass to the generator.
  */
 Runner.prototype.step = function (val) {
+  this.timers.step();
   try {
     this.state = this.gen.next(val);
   } catch (e) {
     this.$propError(e);
     return;
+  } finally {
+    this.timers.stepEnd(
+      this.state.done &&
+      !isGen(this.state.value) &&
+      !this.stack.length
+    );
+  }
+  if (this.state.value && this.state.value.type === 'step') {
+    this.gen.loc = {
+      start: this.state.value.start,
+      end: this.state.value.end
+    };
   }
   if (this.state.value && this.state.value instanceof Thunk) {
     this.stack.push(this.gen);
@@ -245,8 +374,7 @@ Runner.prototype.step = function (val) {
     this.gen.stackFrame = this.state.value;
     this.step();
   } else if (this.state.done) {
-    if (this.state.value &&
-        this.state.value.toString() === '[object Generator]') {
+    if (isGen(this.state.value)) {
       this.gen = this.state.value;
       this.state.value.type = 'functionCall';
       this.state.done = false;
@@ -268,12 +396,19 @@ function Machine(sandbox, options) {
   this.$anonFileId = 0;
   this.halted = false;
   this.paused = false;
-  this.$runner = new Runner();
+  this.timers = new Timers();
+  this.$runner = new Runner(this.timers);
   sandbox.__runner = this.$runner;
   sandbox.__thunk = createThunk;
+  sandbox.setTimeout = this.timers.setTimeout.bind(this.timers);
+  sandbox.setInterval = this.timers.setInterval.bind(this.timers);
+  sandbox.clearTimeout = this.timers.clearTimeout.bind(this.timers);
+  sandbox.clearInterval = this.timers.clearInterval.bind(this.timers);
   sandbox.console = console;
   this.context = new Context(sandbox, options.iframeParentElement);
+  this.context.global = this.context.evaluate('this');
   this.$bootstrapRuntime();
+  this.timers.on('timer', this.$onTimer.bind(this));
 }
 
 inherits(Machine, EventEmitter);
@@ -285,12 +420,11 @@ inherits(Machine, EventEmitter);
 Machine.prototype.$transform = function (code, filename) {
   var ast = recast.parse(code);
   filename = filename || ('file' + (++this.$anonFileId));
-  var transformed = transform(ast, filename);
-  var transformedCode = recast.print(transformed).code;
+  var transformed = transform(ast, { filename: filename });
   if (!isGenSupported) {
-    transformedCode = regenerator(transformedCode);
+    transformed = regenerator.transform(transformed);
   }
-  return transformedCode;
+  return recast.print(transformed).code;
 };
 
 /**
@@ -311,10 +445,16 @@ Machine.prototype.$bootstrapRuntime = function () {
   var regeneratorRuntime = "/**\n * Copyright (c) 2013, Facebook, Inc.\n * All rights reserved.\n *\n * This source code is licensed under the BSD-style license found in the\n * https://raw.github.com/facebook/regenerator/master/LICENSE file. An\n * additional grant of patent rights can be found in the PATENTS file in\n * the same directory.\n */\n\n(function(\n  // Reliable reference to the global object (i.e. window in browsers).\n  global,\n\n  // Dummy constructor that we use as the .constructor property for\n  // functions that return Generator objects.\n  GeneratorFunction\n) {\n  var hasOwn = Object.prototype.hasOwnProperty;\n\n  if (global.wrapGenerator) {\n    return;\n  }\n\n  function wrapGenerator(innerFn, self) {\n    return new Generator(innerFn, self || null);\n  }\n\n  global.wrapGenerator = wrapGenerator;\n  if (typeof exports !== \"undefined\") {\n    exports.wrapGenerator = wrapGenerator;\n  }\n\n  var GenStateSuspendedStart = \"suspendedStart\";\n  var GenStateSuspendedYield = \"suspendedYield\";\n  var GenStateExecuting = \"executing\";\n  var GenStateCompleted = \"completed\";\n\n  // Returning this object from the innerFn has the same effect as\n  // breaking out of the dispatch switch statement.\n  var ContinueSentinel = {};\n\n  wrapGenerator.mark = function(genFun) {\n    genFun.constructor = GeneratorFunction;\n    return genFun;\n  };\n\n  // Ensure isGeneratorFunction works when Function#name not supported.\n  if (GeneratorFunction.name !== \"GeneratorFunction\") {\n    GeneratorFunction.name = \"GeneratorFunction\";\n  }\n\n  wrapGenerator.isGeneratorFunction = function(genFun) {\n    var ctor = genFun && genFun.constructor;\n    return ctor ? GeneratorFunction.name === ctor.name : false;\n  };\n\n  function Generator(innerFn, self) {\n    var generator = this;\n    var context = new Context();\n    var state = GenStateSuspendedStart;\n\n    function invoke() {\n      state = GenStateExecuting;\n      do {\n        var value = innerFn.call(self, context);\n      } while (value === ContinueSentinel);\n      // If an exception is thrown from innerFn, we leave state ===\n      // GenStateExecuting and loop back for another invocation.\n      state = context.done\n        ? GenStateCompleted\n        : GenStateSuspendedYield;\n      return { value: value, done: context.done };\n    }\n\n    function assertCanInvoke() {\n      if (state === GenStateExecuting) {\n        throw new Error(\"Generator is already running\");\n      }\n\n      if (state === GenStateCompleted) {\n        throw new Error(\"Generator has already finished\");\n      }\n    }\n\n    function handleDelegate(method, arg) {\n      var delegate = context.delegate;\n      if (delegate) {\n        try {\n          var info = delegate.generator[method](arg);\n        } catch (uncaught) {\n          context.delegate = null;\n          return generator.throw(uncaught);\n        }\n\n        if (info) {\n          if (info.done) {\n            context[delegate.resultName] = info.value;\n            context.next = delegate.nextLoc;\n          } else {\n            return info;\n          }\n        }\n\n        context.delegate = null;\n      }\n    }\n\n    generator.next = function(value) {\n      assertCanInvoke();\n\n      var delegateInfo = handleDelegate(\"next\", value);\n      if (delegateInfo) {\n        return delegateInfo;\n      }\n\n      if (state === GenStateSuspendedYield) {\n        context.sent = value;\n      }\n\n      while (true) try {\n        return invoke();\n      } catch (exception) {\n        context.dispatchException(exception);\n      }\n    };\n\n    generator.throw = function(exception) {\n      assertCanInvoke();\n\n      var delegateInfo = handleDelegate(\"throw\", exception);\n      if (delegateInfo) {\n        return delegateInfo;\n      }\n\n      if (state === GenStateSuspendedStart) {\n        state = GenStateCompleted;\n        throw exception;\n      }\n\n      while (true) {\n        context.dispatchException(exception);\n        try {\n          return invoke();\n        } catch (thrown) {\n          exception = thrown;\n        }\n      }\n    };\n  }\n\n  Generator.prototype.toString = function() {\n    return \"[object Generator]\";\n  };\n\n  function Context() {\n    this.reset();\n  }\n\n  Context.prototype = {\n    constructor: Context,\n\n    reset: function() {\n      this.next = 0;\n      this.sent = void 0;\n      this.tryStack = [];\n      this.done = false;\n      this.delegate = null;\n\n      // Pre-initialize at least 20 temporary variables to enable hidden\n      // class optimizations for simple generators.\n      for (var tempIndex = 0, tempName;\n           hasOwn.call(this, tempName = \"t\" + tempIndex) || tempIndex < 20;\n           ++tempIndex) {\n        this[tempName] = null;\n      }\n    },\n\n    stop: function() {\n      this.done = true;\n\n      if (hasOwn.call(this, \"thrown\")) {\n        var thrown = this.thrown;\n        delete this.thrown;\n        throw thrown;\n      }\n\n      return this.rval;\n    },\n\n    keys: function(object) {\n      return Object.keys(object).reverse();\n    },\n\n    pushTry: function(catchLoc, finallyLoc, finallyTempVar) {\n      if (finallyLoc) {\n        this.tryStack.push({\n          finallyLoc: finallyLoc,\n          finallyTempVar: finallyTempVar\n        });\n      }\n\n      if (catchLoc) {\n        this.tryStack.push({\n          catchLoc: catchLoc\n        });\n      }\n    },\n\n    popCatch: function(catchLoc) {\n      var lastIndex = this.tryStack.length - 1;\n      var entry = this.tryStack[lastIndex];\n\n      if (entry && entry.catchLoc === catchLoc) {\n        this.tryStack.length = lastIndex;\n      }\n    },\n\n    popFinally: function(finallyLoc) {\n      var lastIndex = this.tryStack.length - 1;\n      var entry = this.tryStack[lastIndex];\n\n      if (!entry || !hasOwn.call(entry, \"finallyLoc\")) {\n        entry = this.tryStack[--lastIndex];\n      }\n\n      if (entry && entry.finallyLoc === finallyLoc) {\n        this.tryStack.length = lastIndex;\n      }\n    },\n\n    dispatchException: function(exception) {\n      var finallyEntries = [];\n      var dispatched = false;\n\n      if (this.done) {\n        throw exception;\n      }\n\n      // Dispatch the exception to the \"end\" location by default.\n      this.thrown = exception;\n      this.next = \"end\";\n\n      for (var i = this.tryStack.length - 1; i >= 0; --i) {\n        var entry = this.tryStack[i];\n        if (entry.catchLoc) {\n          this.next = entry.catchLoc;\n          dispatched = true;\n          break;\n        } else if (entry.finallyLoc) {\n          finallyEntries.push(entry);\n          dispatched = true;\n        }\n      }\n\n      while ((entry = finallyEntries.pop())) {\n        this[entry.finallyTempVar] = this.next;\n        this.next = entry.finallyLoc;\n      }\n    },\n\n    delegateYield: function(generator, resultName, nextLoc) {\n      var info = generator.next(this.sent);\n\n      if (info.done) {\n        this.delegate = null;\n        this[resultName] = info.value;\n        this.next = nextLoc;\n\n        return ContinueSentinel;\n      }\n\n      this.delegate = {\n        generator: generator,\n        resultName: resultName,\n        nextLoc: nextLoc\n      };\n\n      return info.value;\n    }\n  };\n}).apply(this, Function(\"return [this, function GeneratorFunction(){}]\")());\n".toString();
   this.context.evaluate(regeneratorRuntime);
 
-  var arrayRuntime = "// Shortcut to an often accessed properties, in order to avoid multiple\n// dereference that costs universally.\n// _Please note: Shortcuts are defined after `Function.prototype.bind` as we\n// us it in defining shortcuts.\nwrapGenerator.mark(__top);\n\nfunction __top() {\n    var call, prototypeOfObject, _toString, toObject, boxedString, splitString;\n\n    return wrapGenerator(function __top$($ctx) {\n        while (1) switch ($ctx.next) {\n        case 0:\n            $ctx.next = 2;\n\n            return {\n                \"start\": {\n                    \"line\": 5,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 5,\n                    \"column\": 35\n                }\n            }\n        case 2:\n            call = Function.prototype.call;\n            $ctx.next = 5;\n\n            return {\n                \"start\": {\n                    \"line\": 6,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 6,\n                    \"column\": 41\n                }\n            }\n        case 5:\n            prototypeOfObject = Object.prototype;\n            $ctx.next = 8;\n\n            return {\n                \"start\": {\n                    \"line\": 8,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 8,\n                    \"column\": 54\n                }\n            }\n        case 8:\n            $ctx.next = 10;\n\n            return __thunk(wrapGenerator.mark(function thunk() {\n                return wrapGenerator(function thunk$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.rval = call.bind(prototypeOfObject.toString);\n                        delete $ctx.thrown;\n                        $ctx.next = 4;\n                        break;\n                    case 4:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            }), this);\n        case 10:\n            _toString = $ctx.sent;\n            $ctx.next = 13;\n\n            return {\n                \"start\": {\n                    \"line\": 9,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 14,\n                    \"column\": 2\n                }\n            }\n        case 13:\n            toObject = wrapGenerator.mark(function(o) {\n                return wrapGenerator(function($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 10,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 12,\n                                \"column\": 5\n                            }\n                        }\n                    case 2:\n                        if (!(o == null)) {\n                            $ctx.next = 6;\n                            break;\n                        }\n\n                        $ctx.next = 5;\n\n                        return {\n                            \"start\": {\n                                \"line\": 11,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 11,\n                                \"column\": 61\n                            }\n                        }\n                    case 5:\n                        throw new TypeError(\"can't convert \"+o+\" to object\");\n                    case 6:\n                        $ctx.next = 8;\n\n                        return {\n                            \"start\": {\n                                \"line\": 13,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 13,\n                                \"column\": 21\n                            }\n                        }\n                    case 8:\n                        $ctx.next = 10;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = Object(o);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 10:\n                        $ctx.rval = $ctx.sent;\n                        delete $ctx.thrown;\n                        $ctx.next = 14;\n                        break;\n                    case 14:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 16;\n\n            return {\n                \"start\": {\n                    \"line\": 17,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 18,\n                    \"column\": 63\n                }\n            }\n        case 16:\n            $ctx.next = 18;\n\n            return __thunk(wrapGenerator.mark(function thunk() {\n                return wrapGenerator(function thunk$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.rval = Object(\"a\");\n                        delete $ctx.thrown;\n                        $ctx.next = 4;\n                        break;\n                    case 4:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            }), this);\n        case 18:\n            boxedString = $ctx.sent;\n            splitString = boxedString[0] != \"a\" || !(0 in boxedString);\n            $ctx.next = 22;\n\n            return {\n                \"start\": {\n                    \"line\": 19,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 41,\n                    \"column\": 2\n                }\n            }\n        case 22:\n            Array.prototype.forEach = wrapGenerator.mark(function forEach(fun /*, thisp*/) {\n                var object, self, thisp, i, length, $args = arguments;\n\n                return wrapGenerator(function forEach$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 20,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 26,\n                                \"column\": 35\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t0 = splitString;\n\n                        if (!$ctx.t0) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t1 = $ctx.sent;\n                        $ctx.t0 = $ctx.t1 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t0) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t2 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t2 = object;\n                    case 18:\n                        self = $ctx.t2;\n                        thisp = $args[1];\n                        i = -1;\n                        length = self.length >>> 0;\n                        $ctx.next = 24;\n\n                        return {\n                            \"start\": {\n                                \"line\": 29,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 31,\n                                \"column\": 5\n                            }\n                        }\n                    case 24:\n                        $ctx.next = 26;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 26:\n                        $ctx.t3 = $ctx.sent;\n\n                        if (!($ctx.t3 != \"[object Function]\")) {\n                            $ctx.next = 31;\n                            break;\n                        }\n\n                        $ctx.next = 30;\n\n                        return {\n                            \"start\": {\n                                \"line\": 30,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 30,\n                                \"column\": 30\n                            }\n                        }\n                    case 30:\n                        throw new TypeError();\n                    case 31:\n                        $ctx.next = 33;\n\n                        return {\n                            \"start\": {\n                                \"line\": 33,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 40,\n                                \"column\": 5\n                            }\n                        }\n                    case 33:\n                        if (!(++i < length)) {\n                            $ctx.next = 43;\n                            break;\n                        }\n\n                        $ctx.next = 36;\n\n                        return {\n                            \"start\": {\n                                \"line\": 34,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 39,\n                                \"column\": 9\n                            }\n                        }\n                    case 36:\n                        if (!(i in self)) {\n                            $ctx.next = 41;\n                            break;\n                        }\n\n                        $ctx.next = 39;\n\n                        return {\n                            \"start\": {\n                                \"line\": 38,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 38,\n                                \"column\": 48\n                            }\n                        }\n                    case 39:\n                        $ctx.next = 41;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 41:\n                        $ctx.next = 33;\n                        break;\n                    case 43:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 25;\n\n            return {\n                \"start\": {\n                    \"line\": 44,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 63,\n                    \"column\": 2\n                }\n            }\n        case 25:\n            Array.prototype.map = wrapGenerator.mark(function map(fun /*, thisp*/) {\n                var object, self, length, result, thisp, i, $args = arguments;\n\n                return wrapGenerator(function map$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 45,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 51,\n                                \"column\": 29\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t4 = splitString;\n\n                        if (!$ctx.t4) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t5 = $ctx.sent;\n                        $ctx.t4 = $ctx.t5 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t4) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t6 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t6 = object;\n                    case 18:\n                        self = $ctx.t6;\n                        length = self.length >>> 0;\n                        $ctx.next = 22;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = Array(length);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 22:\n                        result = $ctx.sent;\n                        thisp = $args[1];\n                        $ctx.next = 26;\n\n                        return {\n                            \"start\": {\n                                \"line\": 54,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 56,\n                                \"column\": 5\n                            }\n                        }\n                    case 26:\n                        $ctx.next = 28;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 28:\n                        $ctx.t7 = $ctx.sent;\n\n                        if (!($ctx.t7 != \"[object Function]\")) {\n                            $ctx.next = 33;\n                            break;\n                        }\n\n                        $ctx.next = 32;\n\n                        return {\n                            \"start\": {\n                                \"line\": 55,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 55,\n                                \"column\": 56\n                            }\n                        }\n                    case 32:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 33:\n                        $ctx.next = 35;\n\n                        return {\n                            \"start\": {\n                                \"line\": 58,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 61,\n                                \"column\": 5\n                            }\n                        }\n                    case 35:\n                        i = 0;\n                    case 36:\n                        if (!(i < length)) {\n                            $ctx.next = 48;\n                            break;\n                        }\n\n                        $ctx.next = 39;\n\n                        return {\n                            \"start\": {\n                                \"line\": 59,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 60,\n                                \"column\": 60\n                            }\n                        }\n                    case 39:\n                        if (!(i in self)) {\n                            $ctx.next = 45;\n                            break;\n                        }\n\n                        $ctx.next = 42;\n\n                        return {\n                            \"start\": {\n                                \"line\": 60,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 60,\n                                \"column\": 60\n                            }\n                        }\n                    case 42:\n                        $ctx.next = 44;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 44:\n                        result[i] = $ctx.sent;\n                    case 45:\n                        i++;\n                        $ctx.next = 36;\n                        break;\n                    case 48:\n                        $ctx.next = 50;\n\n                        return {\n                            \"start\": {\n                                \"line\": 62,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 62,\n                                \"column\": 18\n                            }\n                        }\n                    case 50:\n                        $ctx.rval = result;\n                        delete $ctx.thrown;\n                        $ctx.next = 54;\n                        break;\n                    case 54:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 28;\n\n            return {\n                \"start\": {\n                    \"line\": 65,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 89,\n                    \"column\": 2\n                }\n            }\n        case 28:\n            Array.prototype.filter = wrapGenerator.mark(function filter(fun /*, thisp */) {\n                var object, self, length, result, value, thisp, i, $args = arguments;\n\n                return wrapGenerator(function filter$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 66,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 73,\n                                \"column\": 29\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t8 = splitString;\n\n                        if (!$ctx.t8) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t9 = $ctx.sent;\n                        $ctx.t8 = $ctx.t9 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t8) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t10 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t10 = object;\n                    case 18:\n                        self = $ctx.t10;\n                        length = self.length >>> 0;\n                        result = [];\n                        thisp = $args[1];\n                        $ctx.next = 24;\n\n                        return {\n                            \"start\": {\n                                \"line\": 76,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 78,\n                                \"column\": 5\n                            }\n                        }\n                    case 24:\n                        $ctx.next = 26;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 26:\n                        $ctx.t11 = $ctx.sent;\n\n                        if (!($ctx.t11 != \"[object Function]\")) {\n                            $ctx.next = 31;\n                            break;\n                        }\n\n                        $ctx.next = 30;\n\n                        return {\n                            \"start\": {\n                                \"line\": 77,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 77,\n                                \"column\": 56\n                            }\n                        }\n                    case 30:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 31:\n                        $ctx.next = 33;\n\n                        return {\n                            \"start\": {\n                                \"line\": 80,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 87,\n                                \"column\": 5\n                            }\n                        }\n                    case 33:\n                        i = 0;\n                    case 34:\n                        if (!(i < length)) {\n                            $ctx.next = 53;\n                            break;\n                        }\n\n                        $ctx.next = 37;\n\n                        return {\n                            \"start\": {\n                                \"line\": 81,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 86,\n                                \"column\": 9\n                            }\n                        }\n                    case 37:\n                        if (!(i in self)) {\n                            $ctx.next = 50;\n                            break;\n                        }\n\n                        $ctx.next = 40;\n\n                        return {\n                            \"start\": {\n                                \"line\": 82,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 82,\n                                \"column\": 28\n                            }\n                        }\n                    case 40:\n                        value = self[i];\n                        $ctx.next = 43;\n\n                        return {\n                            \"start\": {\n                                \"line\": 83,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 85,\n                                \"column\": 13\n                            }\n                        }\n                    case 43:\n                        $ctx.next = 45;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(thisp, value, i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 45:\n                        if (!$ctx.sent) {\n                            $ctx.next = 50;\n                            break;\n                        }\n\n                        $ctx.next = 48;\n\n                        return {\n                            \"start\": {\n                                \"line\": 84,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 84,\n                                \"column\": 35\n                            }\n                        }\n                    case 48:\n                        $ctx.next = 50;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = result.push(value);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 50:\n                        i++;\n                        $ctx.next = 34;\n                        break;\n                    case 53:\n                        $ctx.next = 55;\n\n                        return {\n                            \"start\": {\n                                \"line\": 88,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 88,\n                                \"column\": 18\n                            }\n                        }\n                    case 55:\n                        $ctx.rval = result;\n                        delete $ctx.thrown;\n                        $ctx.next = 59;\n                        break;\n                    case 59:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 31;\n\n            return {\n                \"start\": {\n                    \"line\": 93,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 112,\n                    \"column\": 2\n                }\n            }\n        case 31:\n            Array.prototype.every = wrapGenerator.mark(function every(fun /*, thisp */) {\n                var object, self, length, thisp, i, $args = arguments;\n\n                return wrapGenerator(function every$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 94,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 99,\n                                \"column\": 29\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t12 = splitString;\n\n                        if (!$ctx.t12) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t13 = $ctx.sent;\n                        $ctx.t12 = $ctx.t13 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t12) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t14 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t14 = object;\n                    case 18:\n                        self = $ctx.t14;\n                        length = self.length >>> 0;\n                        thisp = $args[1];\n                        $ctx.next = 23;\n\n                        return {\n                            \"start\": {\n                                \"line\": 102,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 104,\n                                \"column\": 5\n                            }\n                        }\n                    case 23:\n                        $ctx.next = 25;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 25:\n                        $ctx.t15 = $ctx.sent;\n\n                        if (!($ctx.t15 != \"[object Function]\")) {\n                            $ctx.next = 30;\n                            break;\n                        }\n\n                        $ctx.next = 29;\n\n                        return {\n                            \"start\": {\n                                \"line\": 103,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 103,\n                                \"column\": 56\n                            }\n                        }\n                    case 29:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 30:\n                        $ctx.next = 32;\n\n                        return {\n                            \"start\": {\n                                \"line\": 106,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 110,\n                                \"column\": 5\n                            }\n                        }\n                    case 32:\n                        i = 0;\n                    case 33:\n                        if (!(i < length)) {\n                            $ctx.next = 51;\n                            break;\n                        }\n\n                        $ctx.next = 36;\n\n                        return {\n                            \"start\": {\n                                \"line\": 107,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 109,\n                                \"column\": 9\n                            }\n                        }\n                    case 36:\n                        $ctx.t16 = i in self;\n\n                        if (!$ctx.t16) {\n                            $ctx.next = 41;\n                            break;\n                        }\n\n                        $ctx.next = 40;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 40:\n                        $ctx.t16 = !$ctx.sent;\n                    case 41:\n                        if (!$ctx.t16) {\n                            $ctx.next = 48;\n                            break;\n                        }\n\n                        $ctx.next = 44;\n\n                        return {\n                            \"start\": {\n                                \"line\": 108,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 108,\n                                \"column\": 25\n                            }\n                        }\n                    case 44:\n                        $ctx.rval = false;\n                        delete $ctx.thrown;\n                        $ctx.next = 57;\n                        break;\n                    case 48:\n                        i++;\n                        $ctx.next = 33;\n                        break;\n                    case 51:\n                        $ctx.next = 53;\n\n                        return {\n                            \"start\": {\n                                \"line\": 111,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 111,\n                                \"column\": 16\n                            }\n                        }\n                    case 53:\n                        $ctx.rval = true;\n                        delete $ctx.thrown;\n                        $ctx.next = 57;\n                        break;\n                    case 57:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 34;\n\n            return {\n                \"start\": {\n                    \"line\": 115,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 134,\n                    \"column\": 2\n                }\n            }\n        case 34:\n            Array.prototype.some = wrapGenerator.mark(function some(fun /*, thisp */) {\n                var object, self, length, thisp, i, $args = arguments;\n\n                return wrapGenerator(function some$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 116,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 121,\n                                \"column\": 29\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t17 = splitString;\n\n                        if (!$ctx.t17) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t18 = $ctx.sent;\n                        $ctx.t17 = $ctx.t18 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t17) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t19 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t19 = object;\n                    case 18:\n                        self = $ctx.t19;\n                        length = self.length >>> 0;\n                        thisp = $args[1];\n                        $ctx.next = 23;\n\n                        return {\n                            \"start\": {\n                                \"line\": 124,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 126,\n                                \"column\": 5\n                            }\n                        }\n                    case 23:\n                        $ctx.next = 25;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 25:\n                        $ctx.t20 = $ctx.sent;\n\n                        if (!($ctx.t20 != \"[object Function]\")) {\n                            $ctx.next = 30;\n                            break;\n                        }\n\n                        $ctx.next = 29;\n\n                        return {\n                            \"start\": {\n                                \"line\": 125,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 125,\n                                \"column\": 56\n                            }\n                        }\n                    case 29:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 30:\n                        $ctx.next = 32;\n\n                        return {\n                            \"start\": {\n                                \"line\": 128,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 132,\n                                \"column\": 5\n                            }\n                        }\n                    case 32:\n                        i = 0;\n                    case 33:\n                        if (!(i < length)) {\n                            $ctx.next = 51;\n                            break;\n                        }\n\n                        $ctx.next = 36;\n\n                        return {\n                            \"start\": {\n                                \"line\": 129,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 131,\n                                \"column\": 9\n                            }\n                        }\n                    case 36:\n                        $ctx.t21 = i in self;\n\n                        if (!$ctx.t21) {\n                            $ctx.next = 41;\n                            break;\n                        }\n\n                        $ctx.next = 40;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 40:\n                        $ctx.t21 = $ctx.sent;\n                    case 41:\n                        if (!$ctx.t21) {\n                            $ctx.next = 48;\n                            break;\n                        }\n\n                        $ctx.next = 44;\n\n                        return {\n                            \"start\": {\n                                \"line\": 130,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 130,\n                                \"column\": 24\n                            }\n                        }\n                    case 44:\n                        $ctx.rval = true;\n                        delete $ctx.thrown;\n                        $ctx.next = 57;\n                        break;\n                    case 48:\n                        i++;\n                        $ctx.next = 33;\n                        break;\n                    case 51:\n                        $ctx.next = 53;\n\n                        return {\n                            \"start\": {\n                                \"line\": 133,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 133,\n                                \"column\": 17\n                            }\n                        }\n                    case 53:\n                        $ctx.rval = false;\n                        delete $ctx.thrown;\n                        $ctx.next = 57;\n                        break;\n                    case 57:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 37;\n\n            return {\n                \"start\": {\n                    \"line\": 136,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 178,\n                    \"column\": 2\n                }\n            }\n        case 37:\n            Array.prototype.reduce = wrapGenerator.mark(function reduce(fun /*, initial*/) {\n                var object, self, length, i, result, $args = arguments;\n\n                return wrapGenerator(function reduce$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 137,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 141,\n                                \"column\": 35\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t22 = splitString;\n\n                        if (!$ctx.t22) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t23 = $ctx.sent;\n                        $ctx.t22 = $ctx.t23 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t22) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t24 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t24 = object;\n                    case 18:\n                        self = $ctx.t24;\n                        length = self.length >>> 0;\n                        $ctx.next = 22;\n\n                        return {\n                            \"start\": {\n                                \"line\": 144,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 146,\n                                \"column\": 5\n                            }\n                        }\n                    case 22:\n                        $ctx.next = 24;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 24:\n                        $ctx.t25 = $ctx.sent;\n\n                        if (!($ctx.t25 != \"[object Function]\")) {\n                            $ctx.next = 29;\n                            break;\n                        }\n\n                        $ctx.next = 28;\n\n                        return {\n                            \"start\": {\n                                \"line\": 145,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 145,\n                                \"column\": 56\n                            }\n                        }\n                    case 28:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 29:\n                        $ctx.next = 31;\n\n                        return {\n                            \"start\": {\n                                \"line\": 149,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 151,\n                                \"column\": 5\n                            }\n                        }\n                    case 31:\n                        if (!(!length && $args.length == 1)) {\n                            $ctx.next = 35;\n                            break;\n                        }\n\n                        $ctx.next = 34;\n\n                        return {\n                            \"start\": {\n                                \"line\": 150,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 150,\n                                \"column\": 75\n                            }\n                        }\n                    case 34:\n                        throw new TypeError(\"reduce of empty array with no initial value\");\n                    case 35:\n                        $ctx.next = 37;\n\n                        return {\n                            \"start\": {\n                                \"line\": 153,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 153,\n                                \"column\": 14\n                            }\n                        }\n                    case 37:\n                        i = 0;\n                        $ctx.next = 40;\n\n                        return {\n                            \"start\": {\n                                \"line\": 154,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 154,\n                                \"column\": 15\n                            }\n                        }\n                    case 40:\n                        $ctx.next = 42;\n\n                        return {\n                            \"start\": {\n                                \"line\": 155,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 169,\n                                \"column\": 5\n                            }\n                        }\n                    case 42:\n                        if (!($args.length >= 2)) {\n                            $ctx.next = 48;\n                            break;\n                        }\n\n                        $ctx.next = 45;\n\n                        return {\n                            \"start\": {\n                                \"line\": 156,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 156,\n                                \"column\": 30\n                            }\n                        }\n                    case 45:\n                        result = $args[1];\n                        $ctx.next = 68;\n                        break;\n                    case 48:\n                        $ctx.next = 50;\n\n                        return {\n                            \"start\": {\n                                \"line\": 158,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 168,\n                                \"column\": 23\n                            }\n                        }\n                    case 50:\n                        $ctx.next = 52;\n\n                        return {\n                            \"start\": {\n                                \"line\": 159,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 162,\n                                \"column\": 13\n                            }\n                        }\n                    case 52:\n                        if (!(i in self)) {\n                            $ctx.next = 61;\n                            break;\n                        }\n\n                        $ctx.next = 55;\n\n                        return {\n                            \"start\": {\n                                \"line\": 160,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 160,\n                                \"column\": 35\n                            }\n                        }\n                    case 55:\n                        result = self[i++];\n                        $ctx.next = 58;\n\n                        return {\n                            \"start\": {\n                                \"line\": 161,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 161,\n                                \"column\": 22\n                            }\n                        }\n                    case 58:\n                        delete $ctx.thrown;\n                        $ctx.next = 68;\n                        break;\n                    case 61:\n                        $ctx.next = 63;\n\n                        return {\n                            \"start\": {\n                                \"line\": 165,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 167,\n                                \"column\": 13\n                            }\n                        }\n                    case 63:\n                        if (!(++i >= length)) {\n                            $ctx.next = 67;\n                            break;\n                        }\n\n                        $ctx.next = 66;\n\n                        return {\n                            \"start\": {\n                                \"line\": 166,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 166,\n                                \"column\": 83\n                            }\n                        }\n                    case 66:\n                        throw new TypeError(\"reduce of empty array with no initial value\");\n                    case 67:\n                        if (true) {\n                            $ctx.next = 50;\n                            break;\n                        }\n                    case 68:\n                        $ctx.next = 70;\n\n                        return {\n                            \"start\": {\n                                \"line\": 171,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 175,\n                                \"column\": 5\n                            }\n                        }\n                    case 70:\n                        if (!(i < length)) {\n                            $ctx.next = 82;\n                            break;\n                        }\n\n                        $ctx.next = 73;\n\n                        return {\n                            \"start\": {\n                                \"line\": 172,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 174,\n                                \"column\": 9\n                            }\n                        }\n                    case 73:\n                        if (!(i in self)) {\n                            $ctx.next = 79;\n                            break;\n                        }\n\n                        $ctx.next = 76;\n\n                        return {\n                            \"start\": {\n                                \"line\": 173,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 173,\n                                \"column\": 66\n                            }\n                        }\n                    case 76:\n                        $ctx.next = 78;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(void 0, result, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 78:\n                        result = $ctx.sent;\n                    case 79:\n                        i++;\n                        $ctx.next = 70;\n                        break;\n                    case 82:\n                        $ctx.next = 84;\n\n                        return {\n                            \"start\": {\n                                \"line\": 177,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 177,\n                                \"column\": 18\n                            }\n                        }\n                    case 84:\n                        $ctx.rval = result;\n                        delete $ctx.thrown;\n                        $ctx.next = 88;\n                        break;\n                    case 88:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n\n            $ctx.next = 40;\n\n            return {\n                \"start\": {\n                    \"line\": 181,\n                    \"column\": 0\n                },\n\n                \"end\": {\n                    \"line\": 226,\n                    \"column\": 2\n                }\n            }\n        case 40:\n            Array.prototype.reduceRight = wrapGenerator.mark(function reduceRight(fun /*, initial*/) {\n                var object, self, length, result, i, $args = arguments;\n\n                return wrapGenerator(function reduceRight$($ctx) {\n                    while (1) switch ($ctx.next) {\n                    case 0:\n                        $ctx.next = 2;\n\n                        return {\n                            \"start\": {\n                                \"line\": 182,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 186,\n                                \"column\": 35\n                            }\n                        }\n                    case 2:\n                        $ctx.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = toObject(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx.sent;\n                        $ctx.t26 = splitString;\n\n                        if (!$ctx.t26) {\n                            $ctx.next = 11;\n                            break;\n                        }\n\n                        $ctx.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(this);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx.t27 = $ctx.sent;\n                        $ctx.t26 = $ctx.t27 == \"[object String]\";\n                    case 11:\n                        if (!$ctx.t26) {\n                            $ctx.next = 17;\n                            break;\n                        }\n\n                        $ctx.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = this.split(\"\");\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx.t28 = $ctx.sent;\n                        $ctx.next = 18;\n                        break;\n                    case 17:\n                        $ctx.t28 = object;\n                    case 18:\n                        self = $ctx.t28;\n                        length = self.length >>> 0;\n                        $ctx.next = 22;\n\n                        return {\n                            \"start\": {\n                                \"line\": 189,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 191,\n                                \"column\": 5\n                            }\n                        }\n                    case 22:\n                        $ctx.next = 24;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = _toString(fun);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 24:\n                        $ctx.t29 = $ctx.sent;\n\n                        if (!($ctx.t29 != \"[object Function]\")) {\n                            $ctx.next = 29;\n                            break;\n                        }\n\n                        $ctx.next = 28;\n\n                        return {\n                            \"start\": {\n                                \"line\": 190,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 190,\n                                \"column\": 56\n                            }\n                        }\n                    case 28:\n                        throw new TypeError(fun + \" is not a function\");\n                    case 29:\n                        $ctx.next = 31;\n\n                        return {\n                            \"start\": {\n                                \"line\": 194,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 196,\n                                \"column\": 5\n                            }\n                        }\n                    case 31:\n                        if (!(!length && $args.length == 1)) {\n                            $ctx.next = 35;\n                            break;\n                        }\n\n                        $ctx.next = 34;\n\n                        return {\n                            \"start\": {\n                                \"line\": 195,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 195,\n                                \"column\": 80\n                            }\n                        }\n                    case 34:\n                        throw new TypeError(\"reduceRight of empty array with no initial value\");\n                    case 35:\n                        $ctx.next = 37;\n\n                        return {\n                            \"start\": {\n                                \"line\": 198,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 198,\n                                \"column\": 31\n                            }\n                        }\n                    case 37:\n                        i = length - 1;\n                        $ctx.next = 40;\n\n                        return {\n                            \"start\": {\n                                \"line\": 199,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 213,\n                                \"column\": 5\n                            }\n                        }\n                    case 40:\n                        if (!($args.length >= 2)) {\n                            $ctx.next = 46;\n                            break;\n                        }\n\n                        $ctx.next = 43;\n\n                        return {\n                            \"start\": {\n                                \"line\": 200,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 200,\n                                \"column\": 30\n                            }\n                        }\n                    case 43:\n                        result = $args[1];\n                        $ctx.next = 66;\n                        break;\n                    case 46:\n                        $ctx.next = 48;\n\n                        return {\n                            \"start\": {\n                                \"line\": 202,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 212,\n                                \"column\": 23\n                            }\n                        }\n                    case 48:\n                        $ctx.next = 50;\n\n                        return {\n                            \"start\": {\n                                \"line\": 203,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 206,\n                                \"column\": 13\n                            }\n                        }\n                    case 50:\n                        if (!(i in self)) {\n                            $ctx.next = 59;\n                            break;\n                        }\n\n                        $ctx.next = 53;\n\n                        return {\n                            \"start\": {\n                                \"line\": 204,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 204,\n                                \"column\": 35\n                            }\n                        }\n                    case 53:\n                        result = self[i--];\n                        $ctx.next = 56;\n\n                        return {\n                            \"start\": {\n                                \"line\": 205,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 205,\n                                \"column\": 22\n                            }\n                        }\n                    case 56:\n                        delete $ctx.thrown;\n                        $ctx.next = 66;\n                        break;\n                    case 59:\n                        $ctx.next = 61;\n\n                        return {\n                            \"start\": {\n                                \"line\": 209,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 211,\n                                \"column\": 13\n                            }\n                        }\n                    case 61:\n                        if (!(--i < 0)) {\n                            $ctx.next = 65;\n                            break;\n                        }\n\n                        $ctx.next = 64;\n\n                        return {\n                            \"start\": {\n                                \"line\": 210,\n                                \"column\": 16\n                            },\n\n                            \"end\": {\n                                \"line\": 210,\n                                \"column\": 88\n                            }\n                        }\n                    case 64:\n                        throw new TypeError(\"reduceRight of empty array with no initial value\");\n                    case 65:\n                        if (true) {\n                            $ctx.next = 48;\n                            break;\n                        }\n                    case 66:\n                        $ctx.next = 68;\n\n                        return {\n                            \"start\": {\n                                \"line\": 215,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 217,\n                                \"column\": 5\n                            }\n                        }\n                    case 68:\n                        if (!(i < 0)) {\n                            $ctx.next = 75;\n                            break;\n                        }\n\n                        $ctx.next = 71;\n\n                        return {\n                            \"start\": {\n                                \"line\": 216,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 216,\n                                \"column\": 22\n                            }\n                        }\n                    case 71:\n                        $ctx.rval = result;\n                        delete $ctx.thrown;\n                        $ctx.next = 92;\n                        break;\n                    case 75:\n                        $ctx.next = 77;\n\n                        return {\n                            \"start\": {\n                                \"line\": 219,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 223,\n                                \"column\": 18\n                            }\n                        }\n                    case 77:\n                        $ctx.next = 79;\n\n                        return {\n                            \"start\": {\n                                \"line\": 220,\n                                \"column\": 8\n                            },\n\n                            \"end\": {\n                                \"line\": 222,\n                                \"column\": 9\n                            }\n                        }\n                    case 79:\n                        if (!(i in this)) {\n                            $ctx.next = 85;\n                            break;\n                        }\n\n                        $ctx.next = 82;\n\n                        return {\n                            \"start\": {\n                                \"line\": 221,\n                                \"column\": 12\n                            },\n\n                            \"end\": {\n                                \"line\": 221,\n                                \"column\": 66\n                            }\n                        }\n                    case 82:\n                        $ctx.next = 84;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx) {\n                                while (1) switch ($ctx.next) {\n                                case 0:\n                                    $ctx.rval = fun.call(void 0, result, self[i], i, object);\n                                    delete $ctx.thrown;\n                                    $ctx.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 84:\n                        result = $ctx.sent;\n                    case 85:\n                        if (i--) {\n                            $ctx.next = 77;\n                            break;\n                        }\n                    case 86:\n                        $ctx.next = 88;\n\n                        return {\n                            \"start\": {\n                                \"line\": 225,\n                                \"column\": 4\n                            },\n\n                            \"end\": {\n                                \"line\": 225,\n                                \"column\": 18\n                            }\n                        }\n                    case 88:\n                        $ctx.rval = result;\n                        delete $ctx.thrown;\n                        $ctx.next = 92;\n                        break;\n                    case 92:\n                    case \"end\":\n                        return $ctx.stop();\n                    }\n                }, this);\n            });\n        case 41:\n        case \"end\":\n            return $ctx.stop();\n        }\n    }, this);\n}\n".toString();
+  var arrayRuntime = "// Shortcut to an often accessed properties, in order to avoid multiple\n// dereference that costs universally.\n// _Please note: Shortcuts are defined after `Function.prototype.bind` as we\n// us it in defining shortcuts.\nwrapGenerator.mark(__top);\n\nfunction __top() {\n    var call, prototypeOfObject, _toString, toObject, boxedString, splitString;\n\n    return wrapGenerator(function __top$($ctx1) {\n        while (1) switch ($ctx1.next) {\n        case 0:\n            $ctx1.next = 2;\n\n            return {\n                \"type\": \"stackFrame\",\n                \"filename\": \"array.js\",\n                \"name\": \"Global Scope\",\n\n                \"scope\": [{\n                    \"name\": \"call\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 5,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 5,\n                            \"column\": 8\n                        }\n                    }]\n                }, {\n                    \"name\": \"prototypeOfObject\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 6,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 6,\n                            \"column\": 21\n                        }\n                    }]\n                }, {\n                    \"name\": \"_toString\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 8,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 8,\n                            \"column\": 13\n                        }\n                    }]\n                }, {\n                    \"name\": \"toObject\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 9,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 9,\n                            \"column\": 12\n                        }\n                    }]\n                }, {\n                    \"name\": \"boxedString\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 17,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 17,\n                            \"column\": 15\n                        }\n                    }]\n                }, {\n                    \"name\": \"splitString\",\n\n                    \"locs\": [{\n                        \"start\": {\n                            \"line\": 18,\n                            \"column\": 4\n                        },\n\n                        \"end\": {\n                            \"line\": 18,\n                            \"column\": 15\n                        }\n                    }]\n                }],\n\n                \"evalInScope\": function(expr) {\n                    return eval(expr);\n                }\n            }\n        case 2:\n            call = Function.prototype.call;\n            prototypeOfObject = Object.prototype;\n            $ctx1.next = 6;\n\n            return __thunk(wrapGenerator.mark(function thunk() {\n                return wrapGenerator(function thunk$($ctx2) {\n                    while (1) switch ($ctx2.next) {\n                    case 0:\n                        $ctx2.rval = call.bind(prototypeOfObject.toString);\n                        delete $ctx2.thrown;\n                        $ctx2.next = 4;\n                        break;\n                    case 4:\n                    case \"end\":\n                        return $ctx2.stop();\n                    }\n                }, this);\n            }), this);\n        case 6:\n            _toString = $ctx1.sent;\n\n            toObject = wrapGenerator.mark(function(o) {\n                return wrapGenerator(function($ctx3) {\n                    while (1) switch ($ctx3.next) {\n                    case 0:\n                        $ctx3.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"anonymous function\",\n\n                            \"scope\": [{\n                                \"name\": \"o\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 9,\n                                        \"column\": 25\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 9,\n                                        \"column\": 26\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        if (!(o == null)) {\n                            $ctx3.next = 4;\n                            break;\n                        }\n\n                        throw new TypeError(\"can't convert \"+o+\" to object\");\n                    case 4:\n                        $ctx3.next = 6;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx4) {\n                                while (1) switch ($ctx4.next) {\n                                case 0:\n                                    $ctx4.rval = Object(o);\n                                    delete $ctx4.thrown;\n                                    $ctx4.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx4.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 6:\n                        $ctx3.rval = $ctx3.sent;\n                        delete $ctx3.thrown;\n                        $ctx3.next = 10;\n                        break;\n                    case 10:\n                    case \"end\":\n                        return $ctx3.stop();\n                    }\n                }, this);\n            });\n\n            $ctx1.next = 10;\n\n            return __thunk(wrapGenerator.mark(function thunk() {\n                return wrapGenerator(function thunk$($ctx5) {\n                    while (1) switch ($ctx5.next) {\n                    case 0:\n                        $ctx5.rval = Object(\"a\");\n                        delete $ctx5.thrown;\n                        $ctx5.next = 4;\n                        break;\n                    case 4:\n                    case \"end\":\n                        return $ctx5.stop();\n                    }\n                }, this);\n            }), this);\n        case 10:\n            boxedString = $ctx1.sent;\n            splitString = boxedString[0] != \"a\" || !(0 in boxedString);\n\n            Array.prototype.forEach = wrapGenerator.mark(function forEach(fun /*, thisp*/) {\n                var object, self, thisp, i, length, $args = arguments;\n\n                return wrapGenerator(function forEach$($ctx6) {\n                    while (1) switch ($ctx6.next) {\n                    case 0:\n                        $ctx6.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"forEach\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 19,\n                                        \"column\": 43\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 19,\n                                        \"column\": 46\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 20,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 20,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 21,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 21,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"thisp\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 24,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 24,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 25,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 25,\n                                        \"column\": 9\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 26,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 26,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx6.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx7) {\n                                while (1) switch ($ctx7.next) {\n                                case 0:\n                                    $ctx7.rval = toObject(this);\n                                    delete $ctx7.thrown;\n                                    $ctx7.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx7.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx6.sent;\n                        $ctx6.t0 = splitString;\n\n                        if (!$ctx6.t0) {\n                            $ctx6.next = 11;\n                            break;\n                        }\n\n                        $ctx6.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx8) {\n                                while (1) switch ($ctx8.next) {\n                                case 0:\n                                    $ctx8.rval = _toString(this);\n                                    delete $ctx8.thrown;\n                                    $ctx8.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx8.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx6.t1 = $ctx6.sent;\n                        $ctx6.t0 = $ctx6.t1 == \"[object String]\";\n                    case 11:\n                        if (!$ctx6.t0) {\n                            $ctx6.next = 17;\n                            break;\n                        }\n\n                        $ctx6.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx9) {\n                                while (1) switch ($ctx9.next) {\n                                case 0:\n                                    $ctx9.rval = this.split(\"\");\n                                    delete $ctx9.thrown;\n                                    $ctx9.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx9.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx6.t2 = $ctx6.sent;\n                        $ctx6.next = 18;\n                        break;\n                    case 17:\n                        $ctx6.t2 = object;\n                    case 18:\n                        self = $ctx6.t2;\n                        thisp = $args[1];\n                        i = -1;\n                        length = self.length >>> 0;\n                        $ctx6.next = 24;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx10) {\n                                while (1) switch ($ctx10.next) {\n                                case 0:\n                                    $ctx10.rval = _toString(fun);\n                                    delete $ctx10.thrown;\n                                    $ctx10.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx10.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 24:\n                        $ctx6.t3 = $ctx6.sent;\n\n                        if (!($ctx6.t3 != \"[object Function]\")) {\n                            $ctx6.next = 27;\n                            break;\n                        }\n\n                        throw new TypeError();\n                    case 27:\n                        if (!(++i < length)) {\n                            $ctx6.next = 33;\n                            break;\n                        }\n\n                        if (!(i in self)) {\n                            $ctx6.next = 31;\n                            break;\n                        }\n\n                        $ctx6.next = 31;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx11) {\n                                while (1) switch ($ctx11.next) {\n                                case 0:\n                                    $ctx11.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx11.thrown;\n                                    $ctx11.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx11.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 31:\n                        $ctx6.next = 27;\n                        break;\n                    case 33:\n                    case \"end\":\n                        return $ctx6.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.map = wrapGenerator.mark(function map(fun /*, thisp*/) {\n                var object, self, length, result, thisp, i, $args = arguments;\n\n                return wrapGenerator(function map$($ctx12) {\n                    while (1) switch ($ctx12.next) {\n                    case 0:\n                        $ctx12.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"map\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 44,\n                                        \"column\": 35\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 44,\n                                        \"column\": 38\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 45,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 45,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 46,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 46,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 49,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 49,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"result\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 50,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 50,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"thisp\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 51,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 51,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 58,\n                                        \"column\": 13\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 58,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx12.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx13) {\n                                while (1) switch ($ctx13.next) {\n                                case 0:\n                                    $ctx13.rval = toObject(this);\n                                    delete $ctx13.thrown;\n                                    $ctx13.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx13.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx12.sent;\n                        $ctx12.t4 = splitString;\n\n                        if (!$ctx12.t4) {\n                            $ctx12.next = 11;\n                            break;\n                        }\n\n                        $ctx12.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx14) {\n                                while (1) switch ($ctx14.next) {\n                                case 0:\n                                    $ctx14.rval = _toString(this);\n                                    delete $ctx14.thrown;\n                                    $ctx14.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx14.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx12.t5 = $ctx12.sent;\n                        $ctx12.t4 = $ctx12.t5 == \"[object String]\";\n                    case 11:\n                        if (!$ctx12.t4) {\n                            $ctx12.next = 17;\n                            break;\n                        }\n\n                        $ctx12.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx15) {\n                                while (1) switch ($ctx15.next) {\n                                case 0:\n                                    $ctx15.rval = this.split(\"\");\n                                    delete $ctx15.thrown;\n                                    $ctx15.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx15.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx12.t6 = $ctx12.sent;\n                        $ctx12.next = 18;\n                        break;\n                    case 17:\n                        $ctx12.t6 = object;\n                    case 18:\n                        self = $ctx12.t6;\n                        length = self.length >>> 0;\n                        $ctx12.next = 22;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx16) {\n                                while (1) switch ($ctx16.next) {\n                                case 0:\n                                    $ctx16.rval = Array(length);\n                                    delete $ctx16.thrown;\n                                    $ctx16.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx16.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 22:\n                        result = $ctx12.sent;\n                        thisp = $args[1];\n                        $ctx12.next = 26;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx17) {\n                                while (1) switch ($ctx17.next) {\n                                case 0:\n                                    $ctx17.rval = _toString(fun);\n                                    delete $ctx17.thrown;\n                                    $ctx17.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx17.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 26:\n                        $ctx12.t7 = $ctx12.sent;\n\n                        if (!($ctx12.t7 != \"[object Function]\")) {\n                            $ctx12.next = 29;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 29:\n                        i = 0;\n                    case 30:\n                        if (!(i < length)) {\n                            $ctx12.next = 38;\n                            break;\n                        }\n\n                        if (!(i in self)) {\n                            $ctx12.next = 35;\n                            break;\n                        }\n\n                        $ctx12.next = 34;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx18) {\n                                while (1) switch ($ctx18.next) {\n                                case 0:\n                                    $ctx18.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx18.thrown;\n                                    $ctx18.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx18.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 34:\n                        result[i] = $ctx12.sent;\n                    case 35:\n                        i++;\n                        $ctx12.next = 30;\n                        break;\n                    case 38:\n                        $ctx12.rval = result;\n                        delete $ctx12.thrown;\n                        $ctx12.next = 42;\n                        break;\n                    case 42:\n                    case \"end\":\n                        return $ctx12.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.filter = wrapGenerator.mark(function filter(fun /*, thisp */) {\n                var object, self, length, result, value, thisp, i, $args = arguments;\n\n                return wrapGenerator(function filter$($ctx19) {\n                    while (1) switch ($ctx19.next) {\n                    case 0:\n                        $ctx19.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"filter\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 65,\n                                        \"column\": 41\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 65,\n                                        \"column\": 44\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 66,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 66,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 67,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 67,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 70,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 70,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"result\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 71,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 71,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"value\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 72,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 72,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"thisp\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 73,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 73,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 80,\n                                        \"column\": 13\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 80,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx19.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx20) {\n                                while (1) switch ($ctx20.next) {\n                                case 0:\n                                    $ctx20.rval = toObject(this);\n                                    delete $ctx20.thrown;\n                                    $ctx20.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx20.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx19.sent;\n                        $ctx19.t8 = splitString;\n\n                        if (!$ctx19.t8) {\n                            $ctx19.next = 11;\n                            break;\n                        }\n\n                        $ctx19.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx21) {\n                                while (1) switch ($ctx21.next) {\n                                case 0:\n                                    $ctx21.rval = _toString(this);\n                                    delete $ctx21.thrown;\n                                    $ctx21.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx21.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx19.t9 = $ctx19.sent;\n                        $ctx19.t8 = $ctx19.t9 == \"[object String]\";\n                    case 11:\n                        if (!$ctx19.t8) {\n                            $ctx19.next = 17;\n                            break;\n                        }\n\n                        $ctx19.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx22) {\n                                while (1) switch ($ctx22.next) {\n                                case 0:\n                                    $ctx22.rval = this.split(\"\");\n                                    delete $ctx22.thrown;\n                                    $ctx22.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx22.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx19.t10 = $ctx19.sent;\n                        $ctx19.next = 18;\n                        break;\n                    case 17:\n                        $ctx19.t10 = object;\n                    case 18:\n                        self = $ctx19.t10;\n                        length = self.length >>> 0;\n                        result = [];\n                        thisp = $args[1];\n                        $ctx19.next = 24;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx23) {\n                                while (1) switch ($ctx23.next) {\n                                case 0:\n                                    $ctx23.rval = _toString(fun);\n                                    delete $ctx23.thrown;\n                                    $ctx23.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx23.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 24:\n                        $ctx19.t11 = $ctx19.sent;\n\n                        if (!($ctx19.t11 != \"[object Function]\")) {\n                            $ctx19.next = 27;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 27:\n                        i = 0;\n                    case 28:\n                        if (!(i < length)) {\n                            $ctx19.next = 39;\n                            break;\n                        }\n\n                        if (!(i in self)) {\n                            $ctx19.next = 36;\n                            break;\n                        }\n\n                        value = self[i];\n                        $ctx19.next = 33;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx24) {\n                                while (1) switch ($ctx24.next) {\n                                case 0:\n                                    $ctx24.rval = fun.call(thisp, value, i, object);\n                                    delete $ctx24.thrown;\n                                    $ctx24.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx24.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 33:\n                        if (!$ctx19.sent) {\n                            $ctx19.next = 36;\n                            break;\n                        }\n\n                        $ctx19.next = 36;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx25) {\n                                while (1) switch ($ctx25.next) {\n                                case 0:\n                                    $ctx25.rval = result.push(value);\n                                    delete $ctx25.thrown;\n                                    $ctx25.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx25.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 36:\n                        i++;\n                        $ctx19.next = 28;\n                        break;\n                    case 39:\n                        $ctx19.rval = result;\n                        delete $ctx19.thrown;\n                        $ctx19.next = 43;\n                        break;\n                    case 43:\n                    case \"end\":\n                        return $ctx19.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.every = wrapGenerator.mark(function every(fun /*, thisp */) {\n                var object, self, length, thisp, i, $args = arguments;\n\n                return wrapGenerator(function every$($ctx26) {\n                    while (1) switch ($ctx26.next) {\n                    case 0:\n                        $ctx26.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"every\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 93,\n                                        \"column\": 39\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 93,\n                                        \"column\": 42\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 94,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 94,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 95,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 95,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 98,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 98,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"thisp\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 99,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 99,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 106,\n                                        \"column\": 13\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 106,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx26.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx27) {\n                                while (1) switch ($ctx27.next) {\n                                case 0:\n                                    $ctx27.rval = toObject(this);\n                                    delete $ctx27.thrown;\n                                    $ctx27.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx27.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx26.sent;\n                        $ctx26.t12 = splitString;\n\n                        if (!$ctx26.t12) {\n                            $ctx26.next = 11;\n                            break;\n                        }\n\n                        $ctx26.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx28) {\n                                while (1) switch ($ctx28.next) {\n                                case 0:\n                                    $ctx28.rval = _toString(this);\n                                    delete $ctx28.thrown;\n                                    $ctx28.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx28.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx26.t13 = $ctx26.sent;\n                        $ctx26.t12 = $ctx26.t13 == \"[object String]\";\n                    case 11:\n                        if (!$ctx26.t12) {\n                            $ctx26.next = 17;\n                            break;\n                        }\n\n                        $ctx26.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx29) {\n                                while (1) switch ($ctx29.next) {\n                                case 0:\n                                    $ctx29.rval = this.split(\"\");\n                                    delete $ctx29.thrown;\n                                    $ctx29.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx29.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx26.t14 = $ctx26.sent;\n                        $ctx26.next = 18;\n                        break;\n                    case 17:\n                        $ctx26.t14 = object;\n                    case 18:\n                        self = $ctx26.t14;\n                        length = self.length >>> 0;\n                        thisp = $args[1];\n                        $ctx26.next = 23;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx30) {\n                                while (1) switch ($ctx30.next) {\n                                case 0:\n                                    $ctx30.rval = _toString(fun);\n                                    delete $ctx30.thrown;\n                                    $ctx30.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx30.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 23:\n                        $ctx26.t15 = $ctx26.sent;\n\n                        if (!($ctx26.t15 != \"[object Function]\")) {\n                            $ctx26.next = 26;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 26:\n                        i = 0;\n                    case 27:\n                        if (!(i < length)) {\n                            $ctx26.next = 41;\n                            break;\n                        }\n\n                        $ctx26.t16 = i in self;\n\n                        if (!$ctx26.t16) {\n                            $ctx26.next = 33;\n                            break;\n                        }\n\n                        $ctx26.next = 32;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx31) {\n                                while (1) switch ($ctx31.next) {\n                                case 0:\n                                    $ctx31.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx31.thrown;\n                                    $ctx31.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx31.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 32:\n                        $ctx26.t16 = !$ctx26.sent;\n                    case 33:\n                        if (!$ctx26.t16) {\n                            $ctx26.next = 38;\n                            break;\n                        }\n\n                        $ctx26.rval = false;\n                        delete $ctx26.thrown;\n                        $ctx26.next = 45;\n                        break;\n                    case 38:\n                        i++;\n                        $ctx26.next = 27;\n                        break;\n                    case 41:\n                        $ctx26.rval = true;\n                        delete $ctx26.thrown;\n                        $ctx26.next = 45;\n                        break;\n                    case 45:\n                    case \"end\":\n                        return $ctx26.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.some = wrapGenerator.mark(function some(fun /*, thisp */) {\n                var object, self, length, thisp, i, $args = arguments;\n\n                return wrapGenerator(function some$($ctx32) {\n                    while (1) switch ($ctx32.next) {\n                    case 0:\n                        $ctx32.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"some\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 115,\n                                        \"column\": 37\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 115,\n                                        \"column\": 40\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 116,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 116,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 117,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 117,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 120,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 120,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"thisp\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 121,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 121,\n                                        \"column\": 13\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 128,\n                                        \"column\": 13\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 128,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx32.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx33) {\n                                while (1) switch ($ctx33.next) {\n                                case 0:\n                                    $ctx33.rval = toObject(this);\n                                    delete $ctx33.thrown;\n                                    $ctx33.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx33.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx32.sent;\n                        $ctx32.t17 = splitString;\n\n                        if (!$ctx32.t17) {\n                            $ctx32.next = 11;\n                            break;\n                        }\n\n                        $ctx32.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx34) {\n                                while (1) switch ($ctx34.next) {\n                                case 0:\n                                    $ctx34.rval = _toString(this);\n                                    delete $ctx34.thrown;\n                                    $ctx34.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx34.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx32.t18 = $ctx32.sent;\n                        $ctx32.t17 = $ctx32.t18 == \"[object String]\";\n                    case 11:\n                        if (!$ctx32.t17) {\n                            $ctx32.next = 17;\n                            break;\n                        }\n\n                        $ctx32.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx35) {\n                                while (1) switch ($ctx35.next) {\n                                case 0:\n                                    $ctx35.rval = this.split(\"\");\n                                    delete $ctx35.thrown;\n                                    $ctx35.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx35.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx32.t19 = $ctx32.sent;\n                        $ctx32.next = 18;\n                        break;\n                    case 17:\n                        $ctx32.t19 = object;\n                    case 18:\n                        self = $ctx32.t19;\n                        length = self.length >>> 0;\n                        thisp = $args[1];\n                        $ctx32.next = 23;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx36) {\n                                while (1) switch ($ctx36.next) {\n                                case 0:\n                                    $ctx36.rval = _toString(fun);\n                                    delete $ctx36.thrown;\n                                    $ctx36.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx36.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 23:\n                        $ctx32.t20 = $ctx32.sent;\n\n                        if (!($ctx32.t20 != \"[object Function]\")) {\n                            $ctx32.next = 26;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 26:\n                        i = 0;\n                    case 27:\n                        if (!(i < length)) {\n                            $ctx32.next = 41;\n                            break;\n                        }\n\n                        $ctx32.t21 = i in self;\n\n                        if (!$ctx32.t21) {\n                            $ctx32.next = 33;\n                            break;\n                        }\n\n                        $ctx32.next = 32;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx37) {\n                                while (1) switch ($ctx37.next) {\n                                case 0:\n                                    $ctx37.rval = fun.call(thisp, self[i], i, object);\n                                    delete $ctx37.thrown;\n                                    $ctx37.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx37.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 32:\n                        $ctx32.t21 = $ctx32.sent;\n                    case 33:\n                        if (!$ctx32.t21) {\n                            $ctx32.next = 38;\n                            break;\n                        }\n\n                        $ctx32.rval = true;\n                        delete $ctx32.thrown;\n                        $ctx32.next = 45;\n                        break;\n                    case 38:\n                        i++;\n                        $ctx32.next = 27;\n                        break;\n                    case 41:\n                        $ctx32.rval = false;\n                        delete $ctx32.thrown;\n                        $ctx32.next = 45;\n                        break;\n                    case 45:\n                    case \"end\":\n                        return $ctx32.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.reduce = wrapGenerator.mark(function reduce(fun /*, initial*/) {\n                var object, self, length, i, result, $args = arguments;\n\n                return wrapGenerator(function reduce$($ctx38) {\n                    while (1) switch ($ctx38.next) {\n                    case 0:\n                        $ctx38.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"reduce\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 136,\n                                        \"column\": 41\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 136,\n                                        \"column\": 44\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 137,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 137,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 138,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 138,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 141,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 141,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 153,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 153,\n                                        \"column\": 9\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"result\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 154,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 154,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx38.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx39) {\n                                while (1) switch ($ctx39.next) {\n                                case 0:\n                                    $ctx39.rval = toObject(this);\n                                    delete $ctx39.thrown;\n                                    $ctx39.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx39.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx38.sent;\n                        $ctx38.t22 = splitString;\n\n                        if (!$ctx38.t22) {\n                            $ctx38.next = 11;\n                            break;\n                        }\n\n                        $ctx38.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx40) {\n                                while (1) switch ($ctx40.next) {\n                                case 0:\n                                    $ctx40.rval = _toString(this);\n                                    delete $ctx40.thrown;\n                                    $ctx40.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx40.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx38.t23 = $ctx38.sent;\n                        $ctx38.t22 = $ctx38.t23 == \"[object String]\";\n                    case 11:\n                        if (!$ctx38.t22) {\n                            $ctx38.next = 17;\n                            break;\n                        }\n\n                        $ctx38.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx41) {\n                                while (1) switch ($ctx41.next) {\n                                case 0:\n                                    $ctx41.rval = this.split(\"\");\n                                    delete $ctx41.thrown;\n                                    $ctx41.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx41.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx38.t24 = $ctx38.sent;\n                        $ctx38.next = 18;\n                        break;\n                    case 17:\n                        $ctx38.t24 = object;\n                    case 18:\n                        self = $ctx38.t24;\n                        length = self.length >>> 0;\n                        $ctx38.next = 22;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx42) {\n                                while (1) switch ($ctx42.next) {\n                                case 0:\n                                    $ctx42.rval = _toString(fun);\n                                    delete $ctx42.thrown;\n                                    $ctx42.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx42.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 22:\n                        $ctx38.t25 = $ctx38.sent;\n\n                        if (!($ctx38.t25 != \"[object Function]\")) {\n                            $ctx38.next = 25;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 25:\n                        if (!(!length && $args.length == 1)) {\n                            $ctx38.next = 27;\n                            break;\n                        }\n\n                        throw new TypeError(\"reduce of empty array with no initial value\");\n                    case 27:\n                        i = 0;\n\n                        if (!($args.length >= 2)) {\n                            $ctx38.next = 32;\n                            break;\n                        }\n\n                        result = $args[1];\n                        $ctx38.next = 40;\n                        break;\n                    case 32:\n                        if (!(i in self)) {\n                            $ctx38.next = 37;\n                            break;\n                        }\n\n                        result = self[i++];\n                        delete $ctx38.thrown;\n                        $ctx38.next = 40;\n                        break;\n                    case 37:\n                        if (!(++i >= length)) {\n                            $ctx38.next = 39;\n                            break;\n                        }\n\n                        throw new TypeError(\"reduce of empty array with no initial value\");\n                    case 39:\n                        if (true) {\n                            $ctx38.next = 32;\n                            break;\n                        }\n                    case 40:\n                        if (!(i < length)) {\n                            $ctx38.next = 48;\n                            break;\n                        }\n\n                        if (!(i in self)) {\n                            $ctx38.next = 45;\n                            break;\n                        }\n\n                        $ctx38.next = 44;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx43) {\n                                while (1) switch ($ctx43.next) {\n                                case 0:\n                                    $ctx43.rval = fun.call(void 0, result, self[i], i, object);\n                                    delete $ctx43.thrown;\n                                    $ctx43.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx43.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 44:\n                        result = $ctx38.sent;\n                    case 45:\n                        i++;\n                        $ctx38.next = 40;\n                        break;\n                    case 48:\n                        $ctx38.rval = result;\n                        delete $ctx38.thrown;\n                        $ctx38.next = 52;\n                        break;\n                    case 52:\n                    case \"end\":\n                        return $ctx38.stop();\n                    }\n                }, this);\n            });\n\n            Array.prototype.reduceRight = wrapGenerator.mark(function reduceRight(fun /*, initial*/) {\n                var object, self, length, result, i, $args = arguments;\n\n                return wrapGenerator(function reduceRight$($ctx44) {\n                    while (1) switch ($ctx44.next) {\n                    case 0:\n                        $ctx44.next = 2;\n\n                        return {\n                            \"type\": \"stackFrame\",\n                            \"filename\": \"array.js\",\n                            \"name\": \"reduceRight\",\n\n                            \"scope\": [{\n                                \"name\": \"fun\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 181,\n                                        \"column\": 51\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 181,\n                                        \"column\": 54\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"object\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 182,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 182,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"self\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 183,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 183,\n                                        \"column\": 12\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"length\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 186,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 186,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"result\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 198,\n                                        \"column\": 8\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 198,\n                                        \"column\": 14\n                                    }\n                                }]\n                            }, {\n                                \"name\": \"i\",\n\n                                \"locs\": [{\n                                    \"start\": {\n                                        \"line\": 198,\n                                        \"column\": 16\n                                    },\n\n                                    \"end\": {\n                                        \"line\": 198,\n                                        \"column\": 17\n                                    }\n                                }]\n                            }],\n\n                            \"evalInScope\": function(expr) {\n                                return eval(expr);\n                            }\n                        }\n                    case 2:\n                        $ctx44.next = 4;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx45) {\n                                while (1) switch ($ctx45.next) {\n                                case 0:\n                                    $ctx45.rval = toObject(this);\n                                    delete $ctx45.thrown;\n                                    $ctx45.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx45.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 4:\n                        object = $ctx44.sent;\n                        $ctx44.t26 = splitString;\n\n                        if (!$ctx44.t26) {\n                            $ctx44.next = 11;\n                            break;\n                        }\n\n                        $ctx44.next = 9;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx46) {\n                                while (1) switch ($ctx46.next) {\n                                case 0:\n                                    $ctx46.rval = _toString(this);\n                                    delete $ctx46.thrown;\n                                    $ctx46.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx46.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 9:\n                        $ctx44.t27 = $ctx44.sent;\n                        $ctx44.t26 = $ctx44.t27 == \"[object String]\";\n                    case 11:\n                        if (!$ctx44.t26) {\n                            $ctx44.next = 17;\n                            break;\n                        }\n\n                        $ctx44.next = 14;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx47) {\n                                while (1) switch ($ctx47.next) {\n                                case 0:\n                                    $ctx47.rval = this.split(\"\");\n                                    delete $ctx47.thrown;\n                                    $ctx47.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx47.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 14:\n                        $ctx44.t28 = $ctx44.sent;\n                        $ctx44.next = 18;\n                        break;\n                    case 17:\n                        $ctx44.t28 = object;\n                    case 18:\n                        self = $ctx44.t28;\n                        length = self.length >>> 0;\n                        $ctx44.next = 22;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx48) {\n                                while (1) switch ($ctx48.next) {\n                                case 0:\n                                    $ctx48.rval = _toString(fun);\n                                    delete $ctx48.thrown;\n                                    $ctx48.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx48.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 22:\n                        $ctx44.t29 = $ctx44.sent;\n\n                        if (!($ctx44.t29 != \"[object Function]\")) {\n                            $ctx44.next = 25;\n                            break;\n                        }\n\n                        throw new TypeError(fun + \" is not a function\");\n                    case 25:\n                        if (!(!length && $args.length == 1)) {\n                            $ctx44.next = 27;\n                            break;\n                        }\n\n                        throw new TypeError(\"reduceRight of empty array with no initial value\");\n                    case 27:\n                        i = length - 1;\n\n                        if (!($args.length >= 2)) {\n                            $ctx44.next = 32;\n                            break;\n                        }\n\n                        result = $args[1];\n                        $ctx44.next = 40;\n                        break;\n                    case 32:\n                        if (!(i in self)) {\n                            $ctx44.next = 37;\n                            break;\n                        }\n\n                        result = self[i--];\n                        delete $ctx44.thrown;\n                        $ctx44.next = 40;\n                        break;\n                    case 37:\n                        if (!(--i < 0)) {\n                            $ctx44.next = 39;\n                            break;\n                        }\n\n                        throw new TypeError(\"reduceRight of empty array with no initial value\");\n                    case 39:\n                        if (true) {\n                            $ctx44.next = 32;\n                            break;\n                        }\n                    case 40:\n                        if (!(i < 0)) {\n                            $ctx44.next = 45;\n                            break;\n                        }\n\n                        $ctx44.rval = result;\n                        delete $ctx44.thrown;\n                        $ctx44.next = 54;\n                        break;\n                    case 45:\n                        if (!(i in this)) {\n                            $ctx44.next = 49;\n                            break;\n                        }\n\n                        $ctx44.next = 48;\n\n                        return __thunk(wrapGenerator.mark(function thunk() {\n                            return wrapGenerator(function thunk$($ctx49) {\n                                while (1) switch ($ctx49.next) {\n                                case 0:\n                                    $ctx49.rval = fun.call(void 0, result, self[i], i, object);\n                                    delete $ctx49.thrown;\n                                    $ctx49.next = 4;\n                                    break;\n                                case 4:\n                                case \"end\":\n                                    return $ctx49.stop();\n                                }\n                            }, this);\n                        }), this);\n                    case 48:\n                        result = $ctx44.sent;\n                    case 49:\n                        if (i--) {\n                            $ctx44.next = 45;\n                            break;\n                        }\n                    case 50:\n                        $ctx44.rval = result;\n                        delete $ctx44.thrown;\n                        $ctx44.next = 54;\n                        break;\n                    case 54:\n                    case \"end\":\n                        return $ctx44.stop();\n                    }\n                }, this);\n            });\n        case 19:\n        case \"end\":\n            return $ctx1.stop();\n        }\n    }, this);\n}\n".toString();
   this
     .$evaluate(arrayRuntime)
     .run();
+};
+
+Machine.prototype.$onTimer = function (timer) {
+  this.$runner.init(timer.genFn.apply(this.context.global, timer.args));
+  this.halted = false;
+  this.emit('timer');
 };
 
 Machine.prototype.pause = function () {
@@ -374,13 +514,25 @@ Machine.prototype.run = function () {
   return this;
 };
 
+Machine.prototype.$getStackFrame = function (gen) {
+  if (gen.stackFrame) {
+    return clone(gen.stackFrame);
+  } else if (gen.type === 'functionCall') {
+    return {
+      type: gen.type
+    };
+  } else {
+    throw new Error('Unknown call type in stack.');
+  }
+};
+
 /**
  * @public
  */
 Machine.prototype.getCallStack = function () {
-  var stack = [this.$runner.gen.stackFrame];
+  var stack = [this.$getStackFrame(this.$runner.gen)];
   for (var i = this.$runner.stack.length - 1; i >= 0; i--) {
-    stack.unshift(this.$runner.stack[i].stackFrame);
+    stack.unshift(this.$getStackFrame(this.$runner.stack[i]));
   }
   return stack;
 };
@@ -396,9 +548,25 @@ Machine.prototype.getState = function () {
   return this.$runner.state;
 };
 
+Machine.prototype.getCurrentLoc = function () {
+  var loc = this.$runner.gen.loc;
+  if (loc) {
+    return loc;
+  }
+  // Thunks don't have location information so when we are in thunks we'll just
+  // look up the stack to get the first non-thunk location.
+  var stack = this.$runner.stack;
+  var i = stack.length - 1;
+  while (!loc && i >= 0) {
+    loc = stack[i].loc;
+    i++;
+  }
+  return loc;
+};
+
 module.exports = Machine;
 
-},{"./transform":4,"context-eval":19,"events":73,"fs":69,"generator-supported":21,"recast":33,"regenerator":42,"util":78}],4:[function(require,module,exports){
+},{"./transform":4,"context-eval":19,"events":119,"fs":115,"generator-supported":21,"lodash.clonedeep":22,"recast":79,"regenerator":88,"util":124}],4:[function(require,module,exports){
 var recast = require('recast');
 var b = recast.types.builders;
 var types = recast.types.namedTypes;
@@ -475,22 +643,45 @@ function createStackFrame(path, filename) {
   return ret;
 }
 
-function transform(ast, filename) {
+function transform(ast, options) {
   recast.types.traverse(ast, function (n) {
     if (n.__stepper) {
       return false;
     }
 
-    if (types.DebuggerStatement.check(n)) {
-      this.replace(createStep(n.loc, true));
-      return;
+    if (types.CallExpression.check(n)) {
+      var thunk = b.callExpression(
+        b.identifier('__thunk'), [
+          b.functionExpression(
+            b.identifier('thunk'),
+            [],
+            b.blockStatement([b.returnStatement(n)]),
+            true
+          ),
+          b.thisExpression()
+        ]
+      );
+      this.replace(
+        b.yieldExpression(thunk, false)
+      );
     }
 
     if (types.Function.check(n)) {
       this.get('body').replace(
-        b.blockStatement([createStackFrame(this, filename)].concat(n.body.body))
+        b.blockStatement(
+          [createStackFrame(this, options.filename)].concat(n.body.body)
+        )
       );
       n.generator = true;
+    }
+
+    if (options.excludeSteps) {
+      return;
+    }
+
+    if (types.DebuggerStatement.check(n)) {
+      this.replace(createStep(n.loc, true));
+      return;
     }
 
     var parent = this.parent && this.parent.node;
@@ -510,26 +701,13 @@ function transform(ast, filename) {
         !types.ForStatement.check(parent) &&
         !types.ForInStatement.check(parent)) {
       this.replace(b.blockStatement([createStep(n.loc), n]));
-    } else if (types.CallExpression.check(n)) {
-      var thunk = b.callExpression(
-        b.identifier('__thunk'), [
-          b.functionExpression(
-            b.identifier('thunk'),
-            [],
-            b.blockStatement([b.returnStatement(n)]),
-            true
-          ),
-          b.thisExpression()
-        ]
-      );
-      this.replace(
-        b.yieldExpression(thunk, false)
-      );
     }
   });
 
   var body = ast.program.body;
-  body.unshift(createStackFrame(new recast.types.NodePath(ast.program), filename));
+  body.unshift(
+    createStackFrame(new recast.types.NodePath(ast.program), options.filename)
+  );
   ast.program = b.program([
     b.functionDeclaration(
       b.identifier('__top'), [], b.blockStatement(body), true
@@ -540,7 +718,7 @@ function transform(ast, filename) {
 
 module.exports = transform;
 
-},{"recast":33}],5:[function(require,module,exports){
+},{"recast":79}],5:[function(require,module,exports){
 var types = require("../lib/types");
 var Type = types.Type;
 var def = Type.def;
@@ -1615,7 +1793,7 @@ function firstInStatement(path) {
 
 module.exports = NodePath;
 
-},{"./scope":11,"./types":14,"assert":70,"ast-path":17,"util":78}],11:[function(require,module,exports){
+},{"./scope":11,"./types":14,"assert":116,"ast-path":17,"util":124}],11:[function(require,module,exports){
 var assert = require("assert");
 var types = require("./types");
 var Type = types.Type;
@@ -1813,7 +1991,7 @@ Sp.getGlobalScope = function() {
 
 module.exports = Scope;
 
-},{"./node-path":10,"./types":14,"assert":70}],12:[function(require,module,exports){
+},{"./node-path":10,"./types":14,"assert":116}],12:[function(require,module,exports){
 var types = require("../lib/types");
 var Type = types.Type;
 var builtin = types.builtInTypes;
@@ -1956,7 +2134,7 @@ traverseWithFullPathInfo.fast = traverseWithNoPathInfo;
 
 module.exports = traverseWithFullPathInfo;
 
-},{"./node-path":10,"./types":14,"assert":70}],14:[function(require,module,exports){
+},{"./node-path":10,"./types":14,"assert":116}],14:[function(require,module,exports){
 var assert = require("assert");
 var Ap = Array.prototype;
 var slice = Ap.slice;
@@ -2626,7 +2804,7 @@ Object.defineProperty(exports, "finalize", {
     }
 });
 
-},{"assert":70}],15:[function(require,module,exports){
+},{"assert":116}],15:[function(require,module,exports){
 var types = require("./lib/types");
 
 // This core module of AST types captures ES5 as it is parsed today by
@@ -2825,7 +3003,7 @@ Pp.replace = function(replacement) {
 
 exports.Path = Path;
 
-},{"assert":70,"private":18}],17:[function(require,module,exports){
+},{"assert":116,"private":18}],17:[function(require,module,exports){
 exports.Path = require("./lib/path").Path;
 
 },{"./lib/path":16}],18:[function(require,module,exports){
@@ -2954,6 +3132,1376 @@ try {
 }
 
 },{}],22:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseClone = require('lodash._baseclone'),
+    baseCreateCallback = require('lodash._basecreatecallback');
+
+/**
+ * Creates a deep clone of `value`. If a callback is provided it will be
+ * executed to produce the cloned values. If the callback returns `undefined`
+ * cloning will be handled by the method instead. The callback is bound to
+ * `thisArg` and invoked with one argument; (value).
+ *
+ * Note: This method is loosely based on the structured clone algorithm. Functions
+ * and DOM nodes are **not** cloned. The enumerable properties of `arguments` objects and
+ * objects created by constructors other than `Object` are cloned to plain `Object` objects.
+ * See http://www.w3.org/TR/html5/infrastructure.html#internal-structured-cloning-algorithm.
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {*} value The value to deep clone.
+ * @param {Function} [callback] The function to customize cloning values.
+ * @param {*} [thisArg] The `this` binding of `callback`.
+ * @returns {*} Returns the deep cloned value.
+ * @example
+ *
+ * var characters = [
+ *   { 'name': 'barney', 'age': 36 },
+ *   { 'name': 'fred',   'age': 40 }
+ * ];
+ *
+ * var deep = _.cloneDeep(characters);
+ * deep[0] === characters[0];
+ * // => false
+ *
+ * var view = {
+ *   'label': 'docs',
+ *   'node': element
+ * };
+ *
+ * var clone = _.cloneDeep(view, function(value) {
+ *   return _.isElement(value) ? value.cloneNode(true) : undefined;
+ * });
+ *
+ * clone.node == view.node;
+ * // => false
+ */
+function cloneDeep(value, callback, thisArg) {
+  return baseClone(value, true, typeof callback == 'function' && baseCreateCallback(callback, thisArg, 1));
+}
+
+module.exports = cloneDeep;
+
+},{"lodash._baseclone":23,"lodash._basecreatecallback":45}],23:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var assign = require('lodash.assign'),
+    forEach = require('lodash.foreach'),
+    forOwn = require('lodash.forown'),
+    getArray = require('lodash._getarray'),
+    isArray = require('lodash.isarray'),
+    isObject = require('lodash.isobject'),
+    releaseArray = require('lodash._releasearray'),
+    slice = require('lodash._slice');
+
+/** Used to match regexp flags from their coerced string values */
+var reFlags = /\w*$/;
+
+/** `Object#toString` result shortcuts */
+var argsClass = '[object Arguments]',
+    arrayClass = '[object Array]',
+    boolClass = '[object Boolean]',
+    dateClass = '[object Date]',
+    funcClass = '[object Function]',
+    numberClass = '[object Number]',
+    objectClass = '[object Object]',
+    regexpClass = '[object RegExp]',
+    stringClass = '[object String]';
+
+/** Used to identify object classifications that `_.clone` supports */
+var cloneableClasses = {};
+cloneableClasses[funcClass] = false;
+cloneableClasses[argsClass] = cloneableClasses[arrayClass] =
+cloneableClasses[boolClass] = cloneableClasses[dateClass] =
+cloneableClasses[numberClass] = cloneableClasses[objectClass] =
+cloneableClasses[regexpClass] = cloneableClasses[stringClass] = true;
+
+/** Used for native method references */
+var objectProto = Object.prototype;
+
+/** Used to resolve the internal [[Class]] of values */
+var toString = objectProto.toString;
+
+/** Native method shortcuts */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/** Used to lookup a built-in constructor by [[Class]] */
+var ctorByClass = {};
+ctorByClass[arrayClass] = Array;
+ctorByClass[boolClass] = Boolean;
+ctorByClass[dateClass] = Date;
+ctorByClass[funcClass] = Function;
+ctorByClass[objectClass] = Object;
+ctorByClass[numberClass] = Number;
+ctorByClass[regexpClass] = RegExp;
+ctorByClass[stringClass] = String;
+
+/**
+ * The base implementation of `_.clone` without argument juggling or support
+ * for `thisArg` binding.
+ *
+ * @private
+ * @param {*} value The value to clone.
+ * @param {boolean} [isDeep=false] Specify a deep clone.
+ * @param {Function} [callback] The function to customize cloning values.
+ * @param {Array} [stackA=[]] Tracks traversed source objects.
+ * @param {Array} [stackB=[]] Associates clones with source counterparts.
+ * @returns {*} Returns the cloned value.
+ */
+function baseClone(value, isDeep, callback, stackA, stackB) {
+  if (callback) {
+    var result = callback(value);
+    if (typeof result != 'undefined') {
+      return result;
+    }
+  }
+  // inspect [[Class]]
+  var isObj = isObject(value);
+  if (isObj) {
+    var className = toString.call(value);
+    if (!cloneableClasses[className]) {
+      return value;
+    }
+    var ctor = ctorByClass[className];
+    switch (className) {
+      case boolClass:
+      case dateClass:
+        return new ctor(+value);
+
+      case numberClass:
+      case stringClass:
+        return new ctor(value);
+
+      case regexpClass:
+        result = ctor(value.source, reFlags.exec(value));
+        result.lastIndex = value.lastIndex;
+        return result;
+    }
+  } else {
+    return value;
+  }
+  var isArr = isArray(value);
+  if (isDeep) {
+    // check for circular references and return corresponding clone
+    var initedStack = !stackA;
+    stackA || (stackA = getArray());
+    stackB || (stackB = getArray());
+
+    var length = stackA.length;
+    while (length--) {
+      if (stackA[length] == value) {
+        return stackB[length];
+      }
+    }
+    result = isArr ? ctor(value.length) : {};
+  }
+  else {
+    result = isArr ? slice(value) : assign({}, value);
+  }
+  // add array properties assigned by `RegExp#exec`
+  if (isArr) {
+    if (hasOwnProperty.call(value, 'index')) {
+      result.index = value.index;
+    }
+    if (hasOwnProperty.call(value, 'input')) {
+      result.input = value.input;
+    }
+  }
+  // exit for shallow clone
+  if (!isDeep) {
+    return result;
+  }
+  // add the source value to the stack of traversed objects
+  // and associate it with its clone
+  stackA.push(value);
+  stackB.push(result);
+
+  // recursively populate clone (susceptible to call stack limits)
+  (isArr ? forEach : forOwn)(value, function(objValue, key) {
+    result[key] = baseClone(objValue, isDeep, callback, stackA, stackB);
+  });
+
+  if (initedStack) {
+    releaseArray(stackA);
+    releaseArray(stackB);
+  }
+  return result;
+}
+
+module.exports = baseClone;
+
+},{"lodash._getarray":24,"lodash._releasearray":26,"lodash._slice":29,"lodash.assign":30,"lodash.foreach":35,"lodash.forown":36,"lodash.isarray":41,"lodash.isobject":43}],24:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var arrayPool = require('lodash._arraypool');
+
+/**
+ * Gets an array from the array pool or creates a new one if the pool is empty.
+ *
+ * @private
+ * @returns {Array} The array from the pool.
+ */
+function getArray() {
+  return arrayPool.pop() || [];
+}
+
+module.exports = getArray;
+
+},{"lodash._arraypool":25}],25:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used to pool arrays and objects used internally */
+var arrayPool = [];
+
+module.exports = arrayPool;
+
+},{}],26:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var arrayPool = require('lodash._arraypool'),
+    maxPoolSize = require('lodash._maxpoolsize');
+
+/**
+ * Releases the given array back to the array pool.
+ *
+ * @private
+ * @param {Array} [array] The array to release.
+ */
+function releaseArray(array) {
+  array.length = 0;
+  if (arrayPool.length < maxPoolSize) {
+    arrayPool.push(array);
+  }
+}
+
+module.exports = releaseArray;
+
+},{"lodash._arraypool":27,"lodash._maxpoolsize":28}],27:[function(require,module,exports){
+module.exports=require(25)
+},{}],28:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used as the max size of the `arrayPool` and `objectPool` */
+var maxPoolSize = 40;
+
+module.exports = maxPoolSize;
+
+},{}],29:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/**
+ * Slices the `collection` from the `start` index up to, but not including,
+ * the `end` index.
+ *
+ * Note: This function is used instead of `Array#slice` to support node lists
+ * in IE < 9 and to ensure dense arrays are returned.
+ *
+ * @private
+ * @param {Array|Object|string} collection The collection to slice.
+ * @param {number} start The start index.
+ * @param {number} end The end index.
+ * @returns {Array} Returns the new array.
+ */
+function slice(array, start, end) {
+  start || (start = 0);
+  if (typeof end == 'undefined') {
+    end = array ? array.length : 0;
+  }
+  var index = -1,
+      length = end - start || 0,
+      result = Array(length < 0 ? 0 : length);
+
+  while (++index < length) {
+    result[index] = array[start + index];
+  }
+  return result;
+}
+
+module.exports = slice;
+
+},{}],30:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseCreateCallback = require('lodash._basecreatecallback'),
+    keys = require('lodash.keys'),
+    objectTypes = require('lodash._objecttypes');
+
+/**
+ * Assigns own enumerable properties of source object(s) to the destination
+ * object. Subsequent sources will overwrite property assignments of previous
+ * sources. If a callback is provided it will be executed to produce the
+ * assigned values. The callback is bound to `thisArg` and invoked with two
+ * arguments; (objectValue, sourceValue).
+ *
+ * @static
+ * @memberOf _
+ * @type Function
+ * @alias extend
+ * @category Objects
+ * @param {Object} object The destination object.
+ * @param {...Object} [source] The source objects.
+ * @param {Function} [callback] The function to customize assigning values.
+ * @param {*} [thisArg] The `this` binding of `callback`.
+ * @returns {Object} Returns the destination object.
+ * @example
+ *
+ * _.assign({ 'name': 'fred' }, { 'employer': 'slate' });
+ * // => { 'name': 'fred', 'employer': 'slate' }
+ *
+ * var defaults = _.partialRight(_.assign, function(a, b) {
+ *   return typeof a == 'undefined' ? b : a;
+ * });
+ *
+ * var object = { 'name': 'barney' };
+ * defaults(object, { 'name': 'fred', 'employer': 'slate' });
+ * // => { 'name': 'barney', 'employer': 'slate' }
+ */
+var assign = function(object, source, guard) {
+  var index, iterable = object, result = iterable;
+  if (!iterable) return result;
+  var args = arguments,
+      argsIndex = 0,
+      argsLength = typeof guard == 'number' ? 2 : args.length;
+  if (argsLength > 3 && typeof args[argsLength - 2] == 'function') {
+    var callback = baseCreateCallback(args[--argsLength - 1], args[argsLength--], 2);
+  } else if (argsLength > 2 && typeof args[argsLength - 1] == 'function') {
+    callback = args[--argsLength];
+  }
+  while (++argsIndex < argsLength) {
+    iterable = args[argsIndex];
+    if (iterable && objectTypes[typeof iterable]) {
+    var ownIndex = -1,
+        ownProps = objectTypes[typeof iterable] && keys(iterable),
+        length = ownProps ? ownProps.length : 0;
+
+    while (++ownIndex < length) {
+      index = ownProps[ownIndex];
+      result[index] = callback ? callback(result[index], iterable[index]) : iterable[index];
+    }
+    }
+  }
+  return result
+};
+
+module.exports = assign;
+
+},{"lodash._basecreatecallback":45,"lodash._objecttypes":31,"lodash.keys":32}],31:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used to determine if values are of the language type Object */
+var objectTypes = {
+  'boolean': false,
+  'function': true,
+  'object': true,
+  'number': false,
+  'string': false,
+  'undefined': false
+};
+
+module.exports = objectTypes;
+
+},{}],32:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative'),
+    isObject = require('lodash.isobject'),
+    shimKeys = require('lodash._shimkeys');
+
+/* Native method shortcuts for methods with the same name as other `lodash` methods */
+var nativeKeys = isNative(nativeKeys = Object.keys) && nativeKeys;
+
+/**
+ * Creates an array composed of the own enumerable property names of an object.
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {Object} object The object to inspect.
+ * @returns {Array} Returns an array of property names.
+ * @example
+ *
+ * _.keys({ 'one': 1, 'two': 2, 'three': 3 });
+ * // => ['one', 'two', 'three'] (property order is not guaranteed across environments)
+ */
+var keys = !nativeKeys ? shimKeys : function(object) {
+  if (!isObject(object)) {
+    return [];
+  }
+  return nativeKeys(object);
+};
+
+module.exports = keys;
+
+},{"lodash._isnative":33,"lodash._shimkeys":34,"lodash.isobject":43}],33:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/** Used for native method references */
+var objectProto = Object.prototype;
+
+/** Used to resolve the internal [[Class]] of values */
+var toString = objectProto.toString;
+
+/** Used to detect if a method is native */
+var reNative = RegExp('^' +
+  String(toString)
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/toString| for [^\]]+/g, '.*?') + '$'
+);
+
+/**
+ * Checks if `value` is a native function.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is a native function, else `false`.
+ */
+function isNative(value) {
+  return typeof value == 'function' && reNative.test(value);
+}
+
+module.exports = isNative;
+
+},{}],34:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var objectTypes = require('lodash._objecttypes');
+
+/** Used for native method references */
+var objectProto = Object.prototype;
+
+/** Native method shortcuts */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * A fallback implementation of `Object.keys` which produces an array of the
+ * given object's own enumerable property names.
+ *
+ * @private
+ * @type Function
+ * @param {Object} object The object to inspect.
+ * @returns {Array} Returns an array of property names.
+ */
+var shimKeys = function(object) {
+  var index, iterable = object, result = [];
+  if (!iterable) return result;
+  if (!(objectTypes[typeof object])) return result;
+    for (index in iterable) {
+      if (hasOwnProperty.call(iterable, index)) {
+        result.push(index);
+      }
+    }
+  return result
+};
+
+module.exports = shimKeys;
+
+},{"lodash._objecttypes":31}],35:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseCreateCallback = require('lodash._basecreatecallback'),
+    forOwn = require('lodash.forown');
+
+/**
+ * Iterates over elements of a collection, executing the callback for each
+ * element. The callback is bound to `thisArg` and invoked with three arguments;
+ * (value, index|key, collection). Callbacks may exit iteration early by
+ * explicitly returning `false`.
+ *
+ * Note: As with other "Collections" methods, objects with a `length` property
+ * are iterated like arrays. To avoid this behavior `_.forIn` or `_.forOwn`
+ * may be used for object iteration.
+ *
+ * @static
+ * @memberOf _
+ * @alias each
+ * @category Collections
+ * @param {Array|Object|string} collection The collection to iterate over.
+ * @param {Function} [callback=identity] The function called per iteration.
+ * @param {*} [thisArg] The `this` binding of `callback`.
+ * @returns {Array|Object|string} Returns `collection`.
+ * @example
+ *
+ * _([1, 2, 3]).forEach(function(num) { console.log(num); }).join(',');
+ * // => logs each number and returns '1,2,3'
+ *
+ * _.forEach({ 'one': 1, 'two': 2, 'three': 3 }, function(num) { console.log(num); });
+ * // => logs each number and returns the object (property order is not guaranteed across environments)
+ */
+function forEach(collection, callback, thisArg) {
+  var index = -1,
+      length = collection ? collection.length : 0;
+
+  callback = callback && typeof thisArg == 'undefined' ? callback : baseCreateCallback(callback, thisArg, 3);
+  if (typeof length == 'number') {
+    while (++index < length) {
+      if (callback(collection[index], index, collection) === false) {
+        break;
+      }
+    }
+  } else {
+    forOwn(collection, callback);
+  }
+  return collection;
+}
+
+module.exports = forEach;
+
+},{"lodash._basecreatecallback":45,"lodash.forown":36}],36:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseCreateCallback = require('lodash._basecreatecallback'),
+    keys = require('lodash.keys'),
+    objectTypes = require('lodash._objecttypes');
+
+/**
+ * Iterates over own enumerable properties of an object, executing the callback
+ * for each property. The callback is bound to `thisArg` and invoked with three
+ * arguments; (value, key, object). Callbacks may exit iteration early by
+ * explicitly returning `false`.
+ *
+ * @static
+ * @memberOf _
+ * @type Function
+ * @category Objects
+ * @param {Object} object The object to iterate over.
+ * @param {Function} [callback=identity] The function called per iteration.
+ * @param {*} [thisArg] The `this` binding of `callback`.
+ * @returns {Object} Returns `object`.
+ * @example
+ *
+ * _.forOwn({ '0': 'zero', '1': 'one', 'length': 2 }, function(num, key) {
+ *   console.log(key);
+ * });
+ * // => logs '0', '1', and 'length' (property order is not guaranteed across environments)
+ */
+var forOwn = function(collection, callback, thisArg) {
+  var index, iterable = collection, result = iterable;
+  if (!iterable) return result;
+  if (!objectTypes[typeof iterable]) return result;
+  callback = callback && typeof thisArg == 'undefined' ? callback : baseCreateCallback(callback, thisArg, 3);
+    var ownIndex = -1,
+        ownProps = objectTypes[typeof iterable] && keys(iterable),
+        length = ownProps ? ownProps.length : 0;
+
+    while (++ownIndex < length) {
+      index = ownProps[ownIndex];
+      if (callback(iterable[index], index, collection) === false) return result;
+    }
+  return result
+};
+
+module.exports = forOwn;
+
+},{"lodash._basecreatecallback":45,"lodash._objecttypes":37,"lodash.keys":38}],37:[function(require,module,exports){
+module.exports=require(31)
+},{}],38:[function(require,module,exports){
+arguments[4][32][0].apply(exports,arguments)
+},{"lodash._isnative":39,"lodash._shimkeys":40,"lodash.isobject":43}],39:[function(require,module,exports){
+module.exports=require(33)
+},{}],40:[function(require,module,exports){
+module.exports=require(34)
+},{"lodash._objecttypes":37}],41:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative');
+
+/** `Object#toString` result shortcuts */
+var arrayClass = '[object Array]';
+
+/** Used for native method references */
+var objectProto = Object.prototype;
+
+/** Used to resolve the internal [[Class]] of values */
+var toString = objectProto.toString;
+
+/* Native method shortcuts for methods with the same name as other `lodash` methods */
+var nativeIsArray = isNative(nativeIsArray = Array.isArray) && nativeIsArray;
+
+/**
+ * Checks if `value` is an array.
+ *
+ * @static
+ * @memberOf _
+ * @type Function
+ * @category Objects
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is an array, else `false`.
+ * @example
+ *
+ * (function() { return _.isArray(arguments); })();
+ * // => false
+ *
+ * _.isArray([1, 2, 3]);
+ * // => true
+ */
+var isArray = nativeIsArray || function(value) {
+  return value && typeof value == 'object' && typeof value.length == 'number' &&
+    toString.call(value) == arrayClass || false;
+};
+
+module.exports = isArray;
+
+},{"lodash._isnative":42}],42:[function(require,module,exports){
+module.exports=require(33)
+},{}],43:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var objectTypes = require('lodash._objecttypes');
+
+/**
+ * Checks if `value` is the language type of Object.
+ * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(1);
+ * // => false
+ */
+function isObject(value) {
+  // check if the value is the ECMAScript language type of Object
+  // http://es5.github.io/#x8
+  // and avoid a V8 bug
+  // http://code.google.com/p/v8/issues/detail?id=2291
+  return !!(value && objectTypes[typeof value]);
+}
+
+module.exports = isObject;
+
+},{"lodash._objecttypes":44}],44:[function(require,module,exports){
+module.exports=require(31)
+},{}],45:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var bind = require('lodash.bind'),
+    identity = require('lodash.identity'),
+    setBindData = require('lodash._setbinddata'),
+    support = require('lodash.support');
+
+/** Used to detected named functions */
+var reFuncName = /^\s*function[ \n\r\t]+\w/;
+
+/** Used to detect functions containing a `this` reference */
+var reThis = /\bthis\b/;
+
+/** Native method shortcuts */
+var fnToString = Function.prototype.toString;
+
+/**
+ * The base implementation of `_.createCallback` without support for creating
+ * "_.pluck" or "_.where" style callbacks.
+ *
+ * @private
+ * @param {*} [func=identity] The value to convert to a callback.
+ * @param {*} [thisArg] The `this` binding of the created callback.
+ * @param {number} [argCount] The number of arguments the callback accepts.
+ * @returns {Function} Returns a callback function.
+ */
+function baseCreateCallback(func, thisArg, argCount) {
+  if (typeof func != 'function') {
+    return identity;
+  }
+  // exit early for no `thisArg` or already bound by `Function#bind`
+  if (typeof thisArg == 'undefined' || !('prototype' in func)) {
+    return func;
+  }
+  var bindData = func.__bindData__;
+  if (typeof bindData == 'undefined') {
+    if (support.funcNames) {
+      bindData = !func.name;
+    }
+    bindData = bindData || !support.funcDecomp;
+    if (!bindData) {
+      var source = fnToString.call(func);
+      if (!support.funcNames) {
+        bindData = !reFuncName.test(source);
+      }
+      if (!bindData) {
+        // checks if `func` references the `this` keyword and stores the result
+        bindData = reThis.test(source);
+        setBindData(func, bindData);
+      }
+    }
+  }
+  // exit early if there are no `this` references or `func` is bound
+  if (bindData === false || (bindData !== true && bindData[1] & 1)) {
+    return func;
+  }
+  switch (argCount) {
+    case 1: return function(value) {
+      return func.call(thisArg, value);
+    };
+    case 2: return function(a, b) {
+      return func.call(thisArg, a, b);
+    };
+    case 3: return function(value, index, collection) {
+      return func.call(thisArg, value, index, collection);
+    };
+    case 4: return function(accumulator, value, index, collection) {
+      return func.call(thisArg, accumulator, value, index, collection);
+    };
+  }
+  return bind(func, thisArg);
+}
+
+module.exports = baseCreateCallback;
+
+},{"lodash._setbinddata":46,"lodash.bind":49,"lodash.identity":65,"lodash.support":66}],46:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative'),
+    noop = require('lodash.noop');
+
+/** Used as the property descriptor for `__bindData__` */
+var descriptor = {
+  'configurable': false,
+  'enumerable': false,
+  'value': null,
+  'writable': false
+};
+
+/** Used to set meta data on functions */
+var defineProperty = (function() {
+  // IE 8 only accepts DOM elements
+  try {
+    var o = {},
+        func = isNative(func = Object.defineProperty) && func,
+        result = func(o, o, o) && func;
+  } catch(e) { }
+  return result;
+}());
+
+/**
+ * Sets `this` binding data on a given function.
+ *
+ * @private
+ * @param {Function} func The function to set data on.
+ * @param {Array} value The data array to set.
+ */
+var setBindData = !defineProperty ? noop : function(func, value) {
+  descriptor.value = value;
+  defineProperty(func, '__bindData__', descriptor);
+};
+
+module.exports = setBindData;
+
+},{"lodash._isnative":47,"lodash.noop":48}],47:[function(require,module,exports){
+module.exports=require(33)
+},{}],48:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/**
+ * A no-operation function.
+ *
+ * @static
+ * @memberOf _
+ * @category Utilities
+ * @example
+ *
+ * var object = { 'name': 'fred' };
+ * _.noop(object) === undefined;
+ * // => true
+ */
+function noop() {
+  // no operation performed
+}
+
+module.exports = noop;
+
+},{}],49:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var createWrapper = require('lodash._createwrapper'),
+    slice = require('lodash._slice');
+
+/**
+ * Creates a function that, when called, invokes `func` with the `this`
+ * binding of `thisArg` and prepends any additional `bind` arguments to those
+ * provided to the bound function.
+ *
+ * @static
+ * @memberOf _
+ * @category Functions
+ * @param {Function} func The function to bind.
+ * @param {*} [thisArg] The `this` binding of `func`.
+ * @param {...*} [arg] Arguments to be partially applied.
+ * @returns {Function} Returns the new bound function.
+ * @example
+ *
+ * var func = function(greeting) {
+ *   return greeting + ' ' + this.name;
+ * };
+ *
+ * func = _.bind(func, { 'name': 'fred' }, 'hi');
+ * func();
+ * // => 'hi fred'
+ */
+function bind(func, thisArg) {
+  return arguments.length > 2
+    ? createWrapper(func, 17, slice(arguments, 2), null, thisArg)
+    : createWrapper(func, 1, null, null, thisArg);
+}
+
+module.exports = bind;
+
+},{"lodash._createwrapper":50,"lodash._slice":64}],50:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseBind = require('lodash._basebind'),
+    baseCreateWrapper = require('lodash._basecreatewrapper'),
+    isFunction = require('lodash.isfunction'),
+    slice = require('lodash._slice');
+
+/**
+ * Used for `Array` method references.
+ *
+ * Normally `Array.prototype` would suffice, however, using an array literal
+ * avoids issues in Narwhal.
+ */
+var arrayRef = [];
+
+/** Native method shortcuts */
+var push = arrayRef.push,
+    unshift = arrayRef.unshift;
+
+/**
+ * Creates a function that, when called, either curries or invokes `func`
+ * with an optional `this` binding and partially applied arguments.
+ *
+ * @private
+ * @param {Function|string} func The function or method name to reference.
+ * @param {number} bitmask The bitmask of method flags to compose.
+ *  The bitmask may be composed of the following flags:
+ *  1 - `_.bind`
+ *  2 - `_.bindKey`
+ *  4 - `_.curry`
+ *  8 - `_.curry` (bound)
+ *  16 - `_.partial`
+ *  32 - `_.partialRight`
+ * @param {Array} [partialArgs] An array of arguments to prepend to those
+ *  provided to the new function.
+ * @param {Array} [partialRightArgs] An array of arguments to append to those
+ *  provided to the new function.
+ * @param {*} [thisArg] The `this` binding of `func`.
+ * @param {number} [arity] The arity of `func`.
+ * @returns {Function} Returns the new function.
+ */
+function createWrapper(func, bitmask, partialArgs, partialRightArgs, thisArg, arity) {
+  var isBind = bitmask & 1,
+      isBindKey = bitmask & 2,
+      isCurry = bitmask & 4,
+      isCurryBound = bitmask & 8,
+      isPartial = bitmask & 16,
+      isPartialRight = bitmask & 32;
+
+  if (!isBindKey && !isFunction(func)) {
+    throw new TypeError;
+  }
+  if (isPartial && !partialArgs.length) {
+    bitmask &= ~16;
+    isPartial = partialArgs = false;
+  }
+  if (isPartialRight && !partialRightArgs.length) {
+    bitmask &= ~32;
+    isPartialRight = partialRightArgs = false;
+  }
+  var bindData = func && func.__bindData__;
+  if (bindData && bindData !== true) {
+    // clone `bindData`
+    bindData = slice(bindData);
+    if (bindData[2]) {
+      bindData[2] = slice(bindData[2]);
+    }
+    if (bindData[3]) {
+      bindData[3] = slice(bindData[3]);
+    }
+    // set `thisBinding` is not previously bound
+    if (isBind && !(bindData[1] & 1)) {
+      bindData[4] = thisArg;
+    }
+    // set if previously bound but not currently (subsequent curried functions)
+    if (!isBind && bindData[1] & 1) {
+      bitmask |= 8;
+    }
+    // set curried arity if not yet set
+    if (isCurry && !(bindData[1] & 4)) {
+      bindData[5] = arity;
+    }
+    // append partial left arguments
+    if (isPartial) {
+      push.apply(bindData[2] || (bindData[2] = []), partialArgs);
+    }
+    // append partial right arguments
+    if (isPartialRight) {
+      unshift.apply(bindData[3] || (bindData[3] = []), partialRightArgs);
+    }
+    // merge flags
+    bindData[1] |= bitmask;
+    return createWrapper.apply(null, bindData);
+  }
+  // fast path for `_.bind`
+  var creater = (bitmask == 1 || bitmask === 17) ? baseBind : baseCreateWrapper;
+  return creater([func, bitmask, partialArgs, partialRightArgs, thisArg, arity]);
+}
+
+module.exports = createWrapper;
+
+},{"lodash._basebind":51,"lodash._basecreatewrapper":57,"lodash._slice":64,"lodash.isfunction":63}],51:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseCreate = require('lodash._basecreate'),
+    isObject = require('lodash.isobject'),
+    setBindData = require('lodash._setbinddata'),
+    slice = require('lodash._slice');
+
+/**
+ * Used for `Array` method references.
+ *
+ * Normally `Array.prototype` would suffice, however, using an array literal
+ * avoids issues in Narwhal.
+ */
+var arrayRef = [];
+
+/** Native method shortcuts */
+var push = arrayRef.push;
+
+/**
+ * The base implementation of `_.bind` that creates the bound function and
+ * sets its meta data.
+ *
+ * @private
+ * @param {Array} bindData The bind data array.
+ * @returns {Function} Returns the new bound function.
+ */
+function baseBind(bindData) {
+  var func = bindData[0],
+      partialArgs = bindData[2],
+      thisArg = bindData[4];
+
+  function bound() {
+    // `Function#bind` spec
+    // http://es5.github.io/#x15.3.4.5
+    if (partialArgs) {
+      // avoid `arguments` object deoptimizations by using `slice` instead
+      // of `Array.prototype.slice.call` and not assigning `arguments` to a
+      // variable as a ternary expression
+      var args = slice(partialArgs);
+      push.apply(args, arguments);
+    }
+    // mimic the constructor's `return` behavior
+    // http://es5.github.io/#x13.2.2
+    if (this instanceof bound) {
+      // ensure `new bound` is an instance of `func`
+      var thisBinding = baseCreate(func.prototype),
+          result = func.apply(thisBinding, args || arguments);
+      return isObject(result) ? result : thisBinding;
+    }
+    return func.apply(thisArg, args || arguments);
+  }
+  setBindData(bound, bindData);
+  return bound;
+}
+
+module.exports = baseBind;
+
+},{"lodash._basecreate":52,"lodash._setbinddata":46,"lodash._slice":64,"lodash.isobject":55}],52:[function(require,module,exports){
+var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative'),
+    isObject = require('lodash.isobject'),
+    noop = require('lodash.noop');
+
+/* Native method shortcuts for methods with the same name as other `lodash` methods */
+var nativeCreate = isNative(nativeCreate = Object.create) && nativeCreate;
+
+/**
+ * The base implementation of `_.create` without support for assigning
+ * properties to the created object.
+ *
+ * @private
+ * @param {Object} prototype The object to inherit from.
+ * @returns {Object} Returns the new object.
+ */
+function baseCreate(prototype, properties) {
+  return isObject(prototype) ? nativeCreate(prototype) : {};
+}
+// fallback for browsers without `Object.create`
+if (!nativeCreate) {
+  baseCreate = (function() {
+    function Object() {}
+    return function(prototype) {
+      if (isObject(prototype)) {
+        Object.prototype = prototype;
+        var result = new Object;
+        Object.prototype = null;
+      }
+      return result || global.Object();
+    };
+  }());
+}
+
+module.exports = baseCreate;
+
+},{"lodash._isnative":53,"lodash.isobject":55,"lodash.noop":54}],53:[function(require,module,exports){
+module.exports=require(33)
+},{}],54:[function(require,module,exports){
+module.exports=require(48)
+},{}],55:[function(require,module,exports){
+module.exports=require(43)
+},{"lodash._objecttypes":56}],56:[function(require,module,exports){
+module.exports=require(31)
+},{}],57:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var baseCreate = require('lodash._basecreate'),
+    isObject = require('lodash.isobject'),
+    setBindData = require('lodash._setbinddata'),
+    slice = require('lodash._slice');
+
+/**
+ * Used for `Array` method references.
+ *
+ * Normally `Array.prototype` would suffice, however, using an array literal
+ * avoids issues in Narwhal.
+ */
+var arrayRef = [];
+
+/** Native method shortcuts */
+var push = arrayRef.push;
+
+/**
+ * The base implementation of `createWrapper` that creates the wrapper and
+ * sets its meta data.
+ *
+ * @private
+ * @param {Array} bindData The bind data array.
+ * @returns {Function} Returns the new function.
+ */
+function baseCreateWrapper(bindData) {
+  var func = bindData[0],
+      bitmask = bindData[1],
+      partialArgs = bindData[2],
+      partialRightArgs = bindData[3],
+      thisArg = bindData[4],
+      arity = bindData[5];
+
+  var isBind = bitmask & 1,
+      isBindKey = bitmask & 2,
+      isCurry = bitmask & 4,
+      isCurryBound = bitmask & 8,
+      key = func;
+
+  function bound() {
+    var thisBinding = isBind ? thisArg : this;
+    if (partialArgs) {
+      var args = slice(partialArgs);
+      push.apply(args, arguments);
+    }
+    if (partialRightArgs || isCurry) {
+      args || (args = slice(arguments));
+      if (partialRightArgs) {
+        push.apply(args, partialRightArgs);
+      }
+      if (isCurry && args.length < arity) {
+        bitmask |= 16 & ~32;
+        return baseCreateWrapper([func, (isCurryBound ? bitmask : bitmask & ~3), args, null, thisArg, arity]);
+      }
+    }
+    args || (args = arguments);
+    if (isBindKey) {
+      func = thisBinding[key];
+    }
+    if (this instanceof bound) {
+      thisBinding = baseCreate(func.prototype);
+      var result = func.apply(thisBinding, args);
+      return isObject(result) ? result : thisBinding;
+    }
+    return func.apply(thisBinding, args);
+  }
+  setBindData(bound, bindData);
+  return bound;
+}
+
+module.exports = baseCreateWrapper;
+
+},{"lodash._basecreate":58,"lodash._setbinddata":46,"lodash._slice":64,"lodash.isobject":61}],58:[function(require,module,exports){
+arguments[4][52][0].apply(exports,arguments)
+},{"lodash._isnative":59,"lodash.isobject":61,"lodash.noop":60}],59:[function(require,module,exports){
+module.exports=require(33)
+},{}],60:[function(require,module,exports){
+module.exports=require(48)
+},{}],61:[function(require,module,exports){
+module.exports=require(43)
+},{"lodash._objecttypes":62}],62:[function(require,module,exports){
+module.exports=require(31)
+},{}],63:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/**
+ * Checks if `value` is a function.
+ *
+ * @static
+ * @memberOf _
+ * @category Objects
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if the `value` is a function, else `false`.
+ * @example
+ *
+ * _.isFunction(_);
+ * // => true
+ */
+function isFunction(value) {
+  return typeof value == 'function';
+}
+
+module.exports = isFunction;
+
+},{}],64:[function(require,module,exports){
+module.exports=require(29)
+},{}],65:[function(require,module,exports){
+/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+
+/**
+ * This method returns the first argument provided to it.
+ *
+ * @static
+ * @memberOf _
+ * @category Utilities
+ * @param {*} value Any value.
+ * @returns {*} Returns `value`.
+ * @example
+ *
+ * var object = { 'name': 'fred' };
+ * _.identity(object) === object;
+ * // => true
+ */
+function identity(value) {
+  return value;
+}
+
+module.exports = identity;
+
+},{}],66:[function(require,module,exports){
+var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};/**
+ * Lo-Dash 2.4.1 (Custom Build) <http://lodash.com/>
+ * Build: `lodash modularize modern exports="npm" -o ./npm/`
+ * Copyright 2012-2013 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.5.2 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2013 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <http://lodash.com/license>
+ */
+var isNative = require('lodash._isnative');
+
+/** Used to detect functions containing a `this` reference */
+var reThis = /\bthis\b/;
+
+/**
+ * An object used to flag environments features.
+ *
+ * @static
+ * @memberOf _
+ * @type Object
+ */
+var support = {};
+
+/**
+ * Detect if functions can be decompiled by `Function#toString`
+ * (all but PS3 and older Opera mobile browsers & avoided in Windows 8 apps).
+ *
+ * @memberOf _.support
+ * @type boolean
+ */
+support.funcDecomp = !isNative(global.WinRTError) && reThis.test(function() { return this; });
+
+/**
+ * Detect if `Function#name` is supported (all but IE).
+ *
+ * @memberOf _.support
+ * @type boolean
+ */
+support.funcNames = typeof Function.name == 'string';
+
+module.exports = support;
+
+},{"lodash._isnative":67}],67:[function(require,module,exports){
+module.exports=require(33)
+},{}],68:[function(require,module,exports){
 "use strict";
 
 var defProp = Object.defineProperty || function(obj, name, desc) {
@@ -3039,7 +4587,7 @@ defProp(exports, "makeAccessor", {
     value: makeAccessor
 });
 
-},{}],23:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 var assert = require("assert");
 var linesModule = require("./lines");
 var fromString = linesModule.fromString;
@@ -3335,7 +4883,7 @@ exports.printComments = function(comments, innerLines) {
     return concat(parts);
 };
 
-},{"./lines":24,"./util":31,"./visitor":32,"assert":70}],24:[function(require,module,exports){
+},{"./lines":70,"./util":77,"./visitor":78,"assert":116}],70:[function(require,module,exports){
 var assert = require("assert");
 var sourceMap = require("source-map");
 var normalizeOptions = require("./options").normalize;
@@ -4140,7 +5688,7 @@ Lp.concat = function(other) {
 // Lines.prototype will be fully populated.
 var emptyLines = fromString("");
 
-},{"./mapping":25,"./options":26,"./types":30,"./util":31,"assert":70,"private":22,"source-map":59}],25:[function(require,module,exports){
+},{"./mapping":71,"./options":72,"./types":76,"./util":77,"assert":116,"private":68,"source-map":105}],71:[function(require,module,exports){
 var assert = require("assert");
 var types = require("./types");
 var isString = types.builtInTypes.string;
@@ -4419,7 +5967,7 @@ function skipChars(
     return sourceCursor;
 }
 
-},{"./lines":24,"./types":30,"./util":31,"assert":70}],26:[function(require,module,exports){
+},{"./lines":70,"./types":76,"./util":77,"assert":116}],72:[function(require,module,exports){
 var defaults = {
     tabWidth: 4,
     useTabs: false,
@@ -4459,7 +6007,7 @@ exports.normalize = function(options) {
     };
 };
 
-},{"esprima":35}],27:[function(require,module,exports){
+},{"esprima":81}],73:[function(require,module,exports){
 var assert = require("assert");
 var types = require("./types");
 var n = types.namedTypes;
@@ -4597,7 +6145,7 @@ function copyAst(node, parent) {
     return node;
 }
 
-},{"./comments":23,"./lines":24,"./options":26,"./patcher":28,"./types":30,"./visitor":32,"assert":70}],28:[function(require,module,exports){
+},{"./comments":69,"./lines":70,"./options":72,"./patcher":74,"./types":76,"./visitor":78,"assert":116}],74:[function(require,module,exports){
 var assert = require("assert");
 var linesModule = require("./lines");
 var typesModule = require("./types");
@@ -4836,7 +6384,7 @@ function findChildReprints(path, oldNode, reprints) {
     return true;
 }
 
-},{"./lines":24,"./types":30,"./util":31,"assert":70,"ast-types":15}],29:[function(require,module,exports){
+},{"./lines":70,"./types":76,"./util":77,"assert":116,"ast-types":15}],75:[function(require,module,exports){
 var assert = require("assert");
 var sourceMap = require("source-map");
 var printComments = require("./comments").printComments;
@@ -5838,7 +7386,7 @@ function maybeAddSemicolon(lines) {
     return lines;
 }
 
-},{"./comments":23,"./lines":24,"./options":26,"./patcher":28,"./types":30,"./util":31,"assert":70,"source-map":59}],30:[function(require,module,exports){
+},{"./comments":69,"./lines":70,"./options":72,"./patcher":74,"./types":76,"./util":77,"assert":116,"source-map":105}],76:[function(require,module,exports){
 var types = require("ast-types");
 var def = types.Type.def;
 
@@ -5851,7 +7399,7 @@ types.finalize();
 
 module.exports = types;
 
-},{"ast-types":15}],31:[function(require,module,exports){
+},{"ast-types":15}],77:[function(require,module,exports){
 var assert = require("assert");
 var getFieldValue = require("./types").getFieldValue;
 var sourceMap = require("source-map");
@@ -5994,7 +7542,7 @@ exports.composeSourceMaps = function(formerMap, latterMap) {
     return smg.toJSON();
 };
 
-},{"./types":30,"assert":70,"source-map":59}],32:[function(require,module,exports){
+},{"./types":76,"assert":116,"source-map":105}],78:[function(require,module,exports){
 var assert = require("assert");
 var Class = require("cls");
 var Node = require("./types").namedTypes.Node;
@@ -6114,7 +7662,7 @@ var Visitor = exports.Visitor = Class.extend({
     }
 });
 
-},{"./types":30,"assert":70,"cls":34}],33:[function(require,module,exports){
+},{"./types":76,"assert":116,"cls":80}],79:[function(require,module,exports){
 var process=require("__browserify_process");var types = require("./lib/types");
 var parse = require("./lib/parser").parse;
 var Printer = require("./lib/printer").Printer;
@@ -6225,7 +7773,7 @@ Object.defineProperties(exports, {
     }
 });
 
-},{"./lib/parser":27,"./lib/printer":29,"./lib/types":30,"./lib/visitor":32,"__browserify_process":75,"fs":69}],34:[function(require,module,exports){
+},{"./lib/parser":73,"./lib/printer":75,"./lib/types":76,"./lib/visitor":78,"__browserify_process":121,"fs":115}],80:[function(require,module,exports){
 // Sentinel value passed to base constructors to skip invoking this.init.
 var populating = {};
 
@@ -6346,7 +7894,7 @@ function extend(newProps) {
 
 module.exports = extend.call(function(){});
 
-},{}],35:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 /*
   Copyright (C) 2012 Ariya Hidayat <ariya.hidayat@gmail.com>
   Copyright (C) 2012 Mathias Bynens <mathias@qiwi.be>
@@ -10256,7 +11804,7 @@ parseStatement: true, parseSourceElement: true */
 }));
 /* vim: set sw=4 ts=4 et tw=80 : */
 
-},{}],36:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -11298,7 +12846,7 @@ Ep.explodeExpression = function(path, ignoreResult) {
   }
 };
 
-},{"./leap":38,"./meta":39,"assert":70,"ast-types":15}],37:[function(require,module,exports){
+},{"./leap":84,"./meta":85,"assert":116,"ast-types":15}],83:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -11452,7 +13000,7 @@ exports.hoist = function(funPath) {
   return b.variableDeclaration("var", declarations);
 };
 
-},{"assert":70,"ast-types":15}],38:[function(require,module,exports){
+},{"assert":116,"ast-types":15}],84:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -11721,7 +13269,7 @@ LMp.emitReturn = function(argPath) {
   this.emitter.jump(loc);
 };
 
-},{"./emit":36,"assert":70,"ast-types":15,"util":78}],39:[function(require,module,exports){
+},{"./emit":82,"assert":116,"ast-types":15,"util":124}],85:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -11823,7 +13371,7 @@ for (var type in leapTypes) {
 exports.hasSideEffects = makePredicate("hasSideEffects", sideEffectTypes);
 exports.containsLeap = makePredicate("containsLeap", leapTypes);
 
-},{"assert":70,"ast-types":15,"private":22}],40:[function(require,module,exports){
+},{"assert":116,"ast-types":15,"private":68}],86:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -11880,7 +13428,7 @@ exports.defaults = function(obj) {
   return obj;
 };
 
-},{}],41:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 /**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -12014,7 +13562,7 @@ function renameArguments(funcPath, argsId) {
   return didReplaceArguments && hasImplicitArguments;
 }
 
-},{"./emit":36,"./hoist":37,"assert":70,"ast-types":15}],42:[function(require,module,exports){
+},{"./emit":82,"./hoist":83,"assert":116,"ast-types":15}],88:[function(require,module,exports){
 var __dirname="/node_modules/regenerator";/**
  * Copyright (c) 2013, Facebook, Inc.
  * All rights reserved.
@@ -12115,7 +13663,7 @@ regenerator.runtime = {
 // To transform a string of ES6 code, call require("regenerator")(source);
 module.exports = regenerator;
 
-},{"./lib/util":40,"./lib/visit":41,"assert":70,"defs":43,"esprima":58,"fs":69,"path":76,"recast":33}],43:[function(require,module,exports){
+},{"./lib/util":86,"./lib/visit":87,"assert":116,"defs":89,"esprima":104,"fs":115,"path":122,"recast":79}],89:[function(require,module,exports){
 "use strict";
 
 var assert = require("assert");
@@ -12796,7 +14344,7 @@ function run(src, config) {
 
 module.exports = run;
 
-},{"./error":44,"./jshint_globals/vars.js":45,"./options":46,"./scope":47,"./stats":48,"alter":49,"assert":70,"ast-traverse":51,"breakable":52,"simple-fmt":54,"simple-is":55,"stringmap":56,"stringset":57}],44:[function(require,module,exports){
+},{"./error":90,"./jshint_globals/vars.js":91,"./options":92,"./scope":93,"./stats":94,"alter":95,"assert":116,"ast-traverse":97,"breakable":98,"simple-fmt":100,"simple-is":101,"stringmap":102,"stringset":103}],90:[function(require,module,exports){
 "use strict";
 
 var fmt = require("simple-fmt");
@@ -12819,7 +14367,7 @@ error.reset();
 
 module.exports = error;
 
-},{"assert":70,"simple-fmt":54}],45:[function(require,module,exports){
+},{"assert":116,"simple-fmt":100}],91:[function(require,module,exports){
 // jshint -W001
 
 "use strict";
@@ -13216,7 +14764,7 @@ exports.yui = {
 };
 
 
-},{}],46:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 // default configuration
 
 module.exports = {
@@ -13226,7 +14774,7 @@ module.exports = {
     parse: require("esprima").parse,
 };
 
-},{"esprima":53}],47:[function(require,module,exports){
+},{"esprima":99}],93:[function(require,module,exports){
 "use strict";
 
 var assert = require("assert");
@@ -13451,7 +14999,7 @@ Scope.prototype.traverse = function(options) {
 
 module.exports = Scope;
 
-},{"./error":44,"./options":46,"assert":70,"simple-fmt":54,"simple-is":55,"stringmap":56,"stringset":57}],48:[function(require,module,exports){
+},{"./error":90,"./options":92,"assert":116,"simple-fmt":100,"simple-is":101,"stringmap":102,"stringset":103}],94:[function(require,module,exports){
 var fmt = require("simple-fmt");
 var is = require("simple-is");
 var assert = require("assert");
@@ -13503,7 +15051,7 @@ Stats.prototype.toString = function() {
 
 module.exports = Stats;
 
-},{"assert":70,"simple-fmt":54,"simple-is":55}],49:[function(require,module,exports){
+},{"assert":116,"simple-fmt":100,"simple-is":101}],95:[function(require,module,exports){
 // alter.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -13550,7 +15098,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = alter;
 }
 
-},{"assert":70,"stable":50}],50:[function(require,module,exports){
+},{"assert":116,"stable":96}],96:[function(require,module,exports){
 //! stable.js 0.1.4, https://github.com/Two-Screen/stable
 //! © 2012 Stéphan Kochen, Angry Bytes. MIT licensed.
 
@@ -13663,7 +15211,7 @@ else {
 
 })();
 
-},{}],51:[function(require,module,exports){
+},{}],97:[function(require,module,exports){
 function traverse(root, options) {
     "use strict";
 
@@ -13712,7 +15260,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = traverse;
 }
 
-},{}],52:[function(require,module,exports){
+},{}],98:[function(require,module,exports){
 // breakable.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -13750,9 +15298,9 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = breakable;
 }
 
-},{}],53:[function(require,module,exports){
-module.exports=require(35)
-},{}],54:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
+module.exports=require(81)
+},{}],100:[function(require,module,exports){
 // simple-fmt.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -13787,7 +15335,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = fmt;
 }
 
-},{}],55:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 // simple-is.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -13845,7 +15393,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = is;
 }
 
-},{}],56:[function(require,module,exports){
+},{}],102:[function(require,module,exports){
 // stringmap.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -14091,7 +15639,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = StringMap;
 }
 
-},{}],57:[function(require,module,exports){
+},{}],103:[function(require,module,exports){
 // stringset.js
 // MIT licensed, see LICENSE file
 // Copyright (c) 2013 Olov Lassus <olov.lassus@gmail.com>
@@ -14274,7 +15822,7 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     module.exports = StringSet;
 }
 
-},{}],58:[function(require,module,exports){
+},{}],104:[function(require,module,exports){
 /*
   Copyright (C) 2013 Ariya Hidayat <ariya.hidayat@gmail.com>
   Copyright (C) 2013 Thaddee Tyl <thaddee.tyl@gmail.com>
@@ -19790,7 +21338,7 @@ parseYieldExpression: true
 }));
 /* vim: set sw=4 ts=4 et tw=80 : */
 
-},{}],59:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 /*
  * Copyright 2009-2011 Mozilla Foundation and contributors
  * Licensed under the New BSD license. See LICENSE.txt or:
@@ -19800,7 +21348,7 @@ exports.SourceMapGenerator = require('./source-map/source-map-generator').Source
 exports.SourceMapConsumer = require('./source-map/source-map-consumer').SourceMapConsumer;
 exports.SourceNode = require('./source-map/source-node').SourceNode;
 
-},{"./source-map/source-map-consumer":64,"./source-map/source-map-generator":65,"./source-map/source-node":66}],60:[function(require,module,exports){
+},{"./source-map/source-map-consumer":110,"./source-map/source-map-generator":111,"./source-map/source-node":112}],106:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -19899,7 +21447,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"./util":67,"amdefine":68}],61:[function(require,module,exports){
+},{"./util":113,"amdefine":114}],107:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -20045,7 +21593,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"./base64":62,"amdefine":68}],62:[function(require,module,exports){
+},{"./base64":108,"amdefine":114}],108:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -20089,7 +21637,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"amdefine":68}],63:[function(require,module,exports){
+},{"amdefine":114}],109:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -20172,7 +21720,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"amdefine":68}],64:[function(require,module,exports){
+},{"amdefine":114}],110:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -20651,7 +22199,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"./array-set":60,"./base64-vlq":61,"./binary-search":63,"./util":67,"amdefine":68}],65:[function(require,module,exports){
+},{"./array-set":106,"./base64-vlq":107,"./binary-search":109,"./util":113,"amdefine":114}],111:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -21033,7 +22581,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"./array-set":60,"./base64-vlq":61,"./util":67,"amdefine":68}],66:[function(require,module,exports){
+},{"./array-set":106,"./base64-vlq":107,"./util":113,"amdefine":114}],112:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -21406,7 +22954,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"./source-map-generator":65,"./util":67,"amdefine":68}],67:[function(require,module,exports){
+},{"./source-map-generator":111,"./util":113,"amdefine":114}],113:[function(require,module,exports){
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
  * Copyright 2011 Mozilla Foundation and contributors
@@ -21613,7 +23161,7 @@ define(function (require, exports, module) {
 
 });
 
-},{"amdefine":68}],68:[function(require,module,exports){
+},{"amdefine":114}],114:[function(require,module,exports){
 var process=require("__browserify_process"),__filename="/node_modules/source-map/node_modules/amdefine/amdefine.js";/** vim: et:ts=4:sw=4:sts=4
  * @license amdefine 0.1.0 Copyright (c) 2011, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
@@ -21914,9 +23462,9 @@ function amdefine(module, requireFn) {
 
 module.exports = amdefine;
 
-},{"__browserify_process":75,"path":76}],69:[function(require,module,exports){
+},{"__browserify_process":121,"path":122}],115:[function(require,module,exports){
 
-},{}],70:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 // http://wiki.commonjs.org/wiki/Unit_Testing/1.0
 //
 // THIS IS NOT TESTED NOR LIKELY TO WORK OUTSIDE V8!
@@ -22250,7 +23798,7 @@ assert.doesNotThrow = function(block, /*optional*/message) {
 
 assert.ifError = function(err) { if (err) {throw err;}};
 
-},{"./node_modules/util":72}],71:[function(require,module,exports){
+},{"./node_modules/util":118}],117:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
@@ -22259,7 +23807,7 @@ module.exports = function isBuffer(arg) {
     ;
 }
 
-},{}],72:[function(require,module,exports){
+},{}],118:[function(require,module,exports){
 var process=require("__browserify_process"),global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};// Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -22850,7 +24398,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"./support/isBuffer":71,"__browserify_process":75}],73:[function(require,module,exports){
+},{"./support/isBuffer":117,"__browserify_process":121}],119:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -23152,7 +24700,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],74:[function(require,module,exports){
+},{}],120:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -23177,7 +24725,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],75:[function(require,module,exports){
+},{}],121:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -23231,7 +24779,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],76:[function(require,module,exports){
+},{}],122:[function(require,module,exports){
 var process=require("__browserify_process");// Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -23457,9 +25005,9 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-},{"__browserify_process":75}],77:[function(require,module,exports){
-module.exports=require(71)
-},{}],78:[function(require,module,exports){
+},{"__browserify_process":121}],123:[function(require,module,exports){
+module.exports=require(117)
+},{}],124:[function(require,module,exports){
 var process=require("__browserify_process"),global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};// Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -24040,5 +25588,5 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"./support/isBuffer":77,"__browserify_process":75,"inherits":74}]},{},[1])
+},{"./support/isBuffer":123,"__browserify_process":121,"inherits":120}]},{},[1])
 ;
