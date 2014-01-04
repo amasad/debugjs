@@ -26,20 +26,36 @@ if (typeof window !== 'undefined' && window) {
 var inherits = require('util').inherits;
 var EventEmitter = require('events').EventEmitter;
 
+/**
+ * @constructor
+ * @param {Machine} machine
+ */
 function Debugger(machine) {
   this.machine = machine;
   machine.on('debugger', this.$machineDebuggerHandler.bind(this));
   machine.on('timer', this.run.bind(this));
+  machine.on('event', this.run.bind(this));
   this.$breakpoints = {};
   EventEmitter.call(this);
 }
 
 inherits(Debugger, EventEmitter);
 
+/**
+ * @api
+ * @param {string} filename
+ * @return {array}
+ */
 Debugger.prototype.getBreakpoints = function (filename) {
   return this.$breakpoints[filename];
 };
 
+/**
+ * @api
+ * @param {string} filename
+ * @param {array<number>} linenos
+ * @return {Machine}
+ */
 Debugger.prototype.addBreakpoints = function (filename, linenos) {
   if (!this.$breakpoints[filename]) {
     this.$breakpoints[filename] = {};
@@ -47,8 +63,15 @@ Debugger.prototype.addBreakpoints = function (filename, linenos) {
   linenos.forEach(function (lineno) {
     this.$breakpoints[filename][lineno] = true;
   }, this);
+  return this;
 };
 
+/**
+ * @api
+ * @param {string} filename
+ * @param {array<number>} linenos
+ * @return {Machine}
+ */
 Debugger.prototype.removeBreakpoints = function (filename, linenos) {
   if (!linenos) {
     this.$breakpoints[filename] = null;
@@ -73,10 +96,16 @@ Debugger.prototype.$machineDebuggerHandler = function (step) {
   });
 };
 
+Debugger.prototype.$pauseIfNotHalted = function () {
+  if (!this.machine.halted) {
+    this.machine.pause();
+  }
+};
+
 Debugger.prototype.$breakpointHandler = function (data) {
     this.breakpointData = data;
-    this.emit('breakpoint', this.breakpointData);
     this.machine.pause();
+    this.emit('breakpoint', this.breakpointData);
 };
 
 Debugger.prototype.$step = function () {
@@ -97,9 +126,16 @@ Debugger.prototype.$step = function () {
   }
 };
 
+
+/**
+ * @api
+ * @param {object} options
+ */
 Debugger.prototype.getCallStack = function (options) {
   options = options || {};
   if (!options.raw) {
+    // Most end users will probably just want the function call stack without
+    // all the system stuff.
     return this.machine.getCallStack().filter(function (frame) {
       if (frame.type !== 'stackFrame') {
         return false;
@@ -112,6 +148,10 @@ Debugger.prototype.getCallStack = function (options) {
   }
 };
 
+/**
+ * @api
+ * @param {object} options
+ */
 Debugger.prototype.run = function () {
   this.machine.resume();
   var machine = this.machine;
@@ -121,6 +161,10 @@ Debugger.prototype.run = function () {
   return this;
 };
 
+/**
+ * @api
+ * @return {Machine}
+ */
 Debugger.prototype.stepOver = function () {
   this.machine.resume();
   var machine = this.machine;
@@ -136,8 +180,14 @@ Debugger.prototype.stepOver = function () {
   } while ((this.getCallStack({ raw: true }).length > len) &&
             !machine.halted &&
             !machine.paused);
+  this.$pauseIfNotHalted();
+  return this;
 };
 
+/**
+ * @api
+ * @return {Machine}
+ */
 Debugger.prototype.stepIn = function () {
   this.machine.resume();
   this.machine.step();
@@ -145,6 +195,8 @@ Debugger.prototype.stepIn = function () {
   if (state.value && state.value.type === 'functionCall') {
     this.machine.step();
   }
+  this.$pauseIfNotHalted();
+  return this;
 };
 
 Debugger.prototype.$stepOutCondition = function (len) {
@@ -160,16 +212,48 @@ Debugger.prototype.$stepOutCondition = function (len) {
     !machine.paused && !machine.halted;
 };
 
+/**
+ * @api
+ * @return {Machine}
+ */
 Debugger.prototype.stepOut = function () {
   this.machine.resume();
   var len = this.getCallStack({ raw: true }).length - 1;
   while (this.$stepOutCondition(len)) {
     this.$step();
   }
+  this.$pauseIfNotHalted();
+  return this;
 };
 
+/**
+ * @api
+ * @return {Machine}
+ */
 Debugger.prototype.load = function (code, filename) {
   this.machine.evaluate(code, filename);
+  return this;
+};
+
+Debugger.prototype.paused = function () {
+  return this.machine.paused;
+};
+
+Debugger.prototype.halted = function () {
+  return this.machine.halted;
+};
+
+Debugger.prototype.getCurrentLoc = function () {
+  return this.machine.getCurrentLoc();
+};
+
+Debugger.prototype.getContext = function () {
+  return this.machine.context;
+};
+
+Debugger.prototype.getCurrentStackFrame = function () {
+  var stack = this.getCallStack();
+  return stack[stack.length - 1];
 };
 
 module.exports = Debugger;
@@ -191,9 +275,10 @@ var setImmediate = require('timers').setImmediate;
  * @param {function} fn The actual thunk function to invoke.
  * @param {object} thisp The context (this) for which the thunk existed.
  */
-function Thunk(fn, thisp) {
+function Thunk(fn, thisp, args) {
   this.fn = fn;
   this.thisp = thisp;
+  this.args = args;
 }
 
 /**
@@ -201,16 +286,19 @@ function Thunk(fn, thisp) {
  *              a generator object (from our system).
  */
 Thunk.prototype.invoke = function () {
-  return this.fn.call(this.thisp);
+  return this.fn.apply(this.thisp, this.args);
 };
 
 /**
  * shortcut for `Thunk` construct to not use `new`
  */
-function createThunk(fn, thisp) {
-  return new Thunk(fn, thisp);
+function createThunk(fn, thisp, args) {
+  return new Thunk(fn, thisp, args);
 }
 
+/**
+ * @constructor
+ */
 function Timers() {
   this.$q = [];
   this.timeElapsed = 0;
@@ -220,6 +308,9 @@ function Timers() {
 
 inherits(Timers, EventEmitter);
 
+/**
+ * Main timer loop.
+ */
 Timers.prototype.$tick = function () {
   if (this.$idleTimeStart) {
     this.timeElapsed += Date.now() - this.$idleTimeStart;
@@ -239,13 +330,24 @@ Timers.prototype.$tick = function () {
   setImmediate(this.$tick.bind(this));
 };
 
+/**
+ * Sets setInterval and setTimeout timers.
+ * @param {Generator Function} genFn
+ * @param {number} after
+ * @param {array<*>} args
+ * @param {boolean} isInterval
+ * @param {number} id
+ * @return {number} id
+ */
 Timers.prototype.$setTimer = function (genFn, after, args, isInterval, id) {
+  // setInterval have an Id because they repeat themselves.
   if (id == null) {
     id = ++this.$uid;
   }
   var when = this.timeElapsed + after;
   var q = this.$q;
   var i;
+  // We maintain a sorted queue ascending by time to execute.
   for (i = 0; i < q.length; i++) {
     if (q[i].when > when) {
       break;
@@ -262,16 +364,34 @@ Timers.prototype.$setTimer = function (genFn, after, args, isInterval, id) {
   return id;
 };
 
+/**
+ * @api
+ * @param {Generator Function} genFn
+ * @param {number} after
+ * @return {number} id
+ */
 Timers.prototype.setTimeout = function (genFn, after) {
   var args = Array.prototype.slice.call(arguments, 2);
   return this.$setTimer(genFn, after, args, false);
 };
 
+/**
+ * @api
+ * @param {Generator Function} genFn
+ * @param {number} after
+ * @return {number} id
+ */
 Timers.prototype.setInterval = function (genFn, after) {
   var args = Array.prototype.slice.call(arguments, 2);
   return this.$setTimer(genFn, after, args, true);
 };
 
+/**
+ * @api
+ * @param {Generator Function} genFn
+ * @param {number} after
+ * @return {number} id
+ */
 Timers.prototype.clearTimeout =
 Timers.prototype.clearInterval = function (id) {
   var q = this.$q;
@@ -283,10 +403,18 @@ Timers.prototype.clearInterval = function (id) {
   }
 };
 
+/**
+ * Starts a timer for a single step.
+ * @api
+ */
 Timers.prototype.step = function () {
   this.$start = Date.now();
 };
 
+/**
+ * Stop and increment system time for an execution step.
+ * @api
+ */
 Timers.prototype.stepEnd = function (halted) {
   this.timeElapsed += Date.now() - this.$start;
   if (halted) {
@@ -304,6 +432,7 @@ function Runner(timers) {
 }
 
 /**
+ * @api
  * @param {Generator} gen The first generator in our callstack.
  */
 Runner.prototype.init = function (gen) {
@@ -315,6 +444,11 @@ Runner.prototype.init = function (gen) {
   };
 };
 
+
+/**
+ * Propogate error up the call stack.
+ * @param {object} e
+ */
 Runner.prototype.$propError = function (e) {
   while (this.stack.length) {
     this.gen = this.stack.pop();
@@ -328,6 +462,10 @@ Runner.prototype.$propError = function (e) {
   throw e;
 };
 
+/**
+ * @param {*} val
+ * @return {boolean}
+ */
 function isGen(val) {
   return val && val.toString() === '[object Generator]';
 }
@@ -346,6 +484,7 @@ function isGen(val) {
  *     b. we're done with a regular function call and we need to pass the value
  *        as the resulting `yield` expression.
  *
+ * @api
  * @param {*} val The value of the yield expression to pass to the generator.
  */
 Runner.prototype.step = function (val) {
@@ -362,12 +501,7 @@ Runner.prototype.step = function (val) {
       !this.stack.length
     );
   }
-  if (this.state.value && this.state.value.type === 'step') {
-    this.gen.loc = {
-      start: this.state.value.start,
-      end: this.state.value.end
-    };
-  }
+
   if (this.state.value && this.state.value instanceof Thunk) {
     this.stack.push(this.gen);
     this.gen = this.state.value.invoke();
@@ -389,7 +523,7 @@ Runner.prototype.step = function (val) {
 };
 
 /**
- * @public
+ * @api
  * @constructor
  * @param {object} sandbox An object with things to be copied into the context.
  */
@@ -403,6 +537,7 @@ function Machine(sandbox, options) {
   this.$runner = new Runner(this.timers);
   sandbox.__runner = this.$runner;
   sandbox.__thunk = createThunk;
+  sandbox.__wrapListener = this.$wrapListener.bind(this);
   sandbox.setTimeout = this.timers.setTimeout.bind(this.timers);
   sandbox.setInterval = this.timers.setInterval.bind(this.timers);
   sandbox.clearTimeout = this.timers.clearTimeout.bind(this.timers);
@@ -452,28 +587,58 @@ Machine.prototype.$bootstrapRuntime = function () {
   this
     .$evaluate(arrayRuntime)
     .run();
+
+  var domRuntime = "(function () {\n\n  if (typeof EventTarget !== 'undefined') {\n    var _on = EventTarget.prototype.addEventListener;\n    EventTarget.prototype.addEventListener =\n    function (type, listener, useCapture, wantsUntrusted) {\n      console.log(this)\n      return _on.call(\n        this,\n        type,\n        __wrapListener(listener),\n        useCapture,\n        wantsUntrusted\n      );\n    };\n  }\n\n})();\n".toString();
+  this
+    .$evaluate(domRuntime)
+    .run();
 };
 
+/**
+ * @param {object} timer
+ */
 Machine.prototype.$onTimer = function (timer) {
   this.$runner.init(timer.genFn.apply(this.context.global, timer.args));
   this.halted = false;
   this.emit('timer');
 };
 
+Machine.prototype.$onEvent = function (gen) {
+  this.$runner.init(gen);
+  this.halted = false;
+  this.emit('event');
+};
+
+Machine.prototype.$wrapListener = function (genFn) {
+  var dispatch = this.$onEvent.bind(this);
+  return function () {
+    var gen = genFn.apply(this, arguments);
+    dispatch(gen);
+  };
+};
+
+/**
+ * @api
+ * @return {Machine}
+ */
 Machine.prototype.pause = function () {
   this.paused = true;
   return this;
 };
 
+/**
+ * @api
+ * @return {Machine}
+ */
 Machine.prototype.resume = function () {
   this.paused = false;
   return this;
 };
 
 /**
- * @public
+ * @api
  * @param {string} code
- * @return {Machine} this
+ * @return {Machine}
  */
 Machine.prototype.evaluate = function (code, filename) {
   var transformed = this.$transform(code, filename);
@@ -482,8 +647,8 @@ Machine.prototype.evaluate = function (code, filename) {
 };
 
 /**
- * @public
- * @return {*} value from the step.
+ * @api
+ * @return {Machine}
  */
 Machine.prototype.step = function () {
   try {
@@ -494,11 +659,19 @@ Machine.prototype.step = function () {
     this.halted = true;
     return;
   }
-  if (this.$runner.state.value &&
-      this.$runner.state.value.type === 'debugger') {
+  var state = this.$runner.state;
+  // Update latest location on the current generator function.
+  // @see this.getCurrentLoc()
+  if (state.value && state.value.type === 'step') {
+    this.$runner.gen.loc = {
+      start: state.value.start,
+      end: state.value.end
+    };
+  }
+  if (state.value && state.value.type === 'debugger') {
     // When we hit a debugger statement, emit a debugger event, and if there
     // were no listeners then we recur, i.e. ignore. Otherwise we pause.
-    if (this.emit('debugger', this.$runner.state.value)) {
+    if (this.emit('debugger', state.value)) {
       this.pause();
     } else {
       return this.step();
@@ -508,7 +681,8 @@ Machine.prototype.step = function () {
 };
 
 /**
- * @public
+ * @api
+ * @return {Machine}
  */
 Machine.prototype.run = function () {
   while (!this.halted && !this.paused) {
@@ -517,8 +691,13 @@ Machine.prototype.run = function () {
   return this;
 };
 
+/**
+ * Helper function to get the stackFrame representation from a generator object.
+ * @return {object}
+ */
 Machine.prototype.$getStackFrame = function (gen) {
   if (gen.stackFrame) {
+    // Clone object so we don't have data types from a another context.
     return clone(gen.stackFrame);
   } else if (gen.type === 'functionCall' || gen.type === 'thunk') {
     return {
@@ -530,7 +709,8 @@ Machine.prototype.$getStackFrame = function (gen) {
 };
 
 /**
- * @public
+ * @api
+ * @return {array}
  */
 Machine.prototype.getCallStack = function () {
   var stack = [this.$getStackFrame(this.$runner.gen)];
@@ -540,17 +720,26 @@ Machine.prototype.getCallStack = function () {
   return stack;
 };
 
+/**
+ * @api
+ * @return {array}
+ */
 Machine.prototype.getCurrentStackFrame = function () {
-  return this.$runner.gen.stackFrame;
+  return this.$getStackFrame(this.$runner.gen);
 };
 
 /**
- * @public
+ * @api
+ * @return {object}
  */
 Machine.prototype.getState = function () {
   return this.$runner.state;
 };
 
+/**
+ * @api
+ * @return {object}
+ */
 Machine.prototype.getCurrentLoc = function () {
   var loc = this.$runner.gen.loc;
   if (loc) {
@@ -562,7 +751,7 @@ Machine.prototype.getCurrentLoc = function () {
   var i = stack.length - 1;
   while (!loc && i >= 0) {
     loc = stack[i].loc;
-    i++;
+    i--;
   }
   return loc;
 };
@@ -661,7 +850,8 @@ function transform(ast, options) {
             b.blockStatement([b.returnStatement(n)]),
             true
           ),
-          b.thisExpression()
+          b.thisExpression(),
+          b.identifier('arguments')
         ]
       );
       this.replace(
