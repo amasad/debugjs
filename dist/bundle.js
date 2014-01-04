@@ -542,7 +542,7 @@ function Machine(sandbox, options) {
   sandbox.setInterval = this.timers.setInterval.bind(this.timers);
   sandbox.clearTimeout = this.timers.clearTimeout.bind(this.timers);
   sandbox.clearInterval = this.timers.clearInterval.bind(this.timers);
-  sandbox.console = console;
+  sandbox.console = sandbox.console || console;
   this.context = new Context(sandbox, options.iframeParentElement);
   this.context.global = this.context.evaluate('this');
   this.$bootstrapRuntime();
