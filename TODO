@@ -1,2 +1,10 @@
-add function end debug statement
-test component.js
+Add function end debug statement, this useful for recursion or for when
+returning values from multiple function calls it's nice to see what function
+the debugger is returning from, however, it's not straightforward because
+function return statements ends the generator and if we need to implment that
+we need to introduce a new instruction for return so we could go back to the
+function and show the last step. Maybe this could be done in the debugger?
+
+test component build works.
+
+add general event dispatch.
