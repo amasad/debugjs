@@ -793,62 +793,112 @@ describe('Machine#getCurrentLoc', function () {
 
 describe('timers', function () {
 
-  it('a single setTimeout should fire passing arguments', function (done) {
-    var source = fnString(function () {
-      var start = Date.now();
-      setTimeout(function (foo, one) {
-        report(Date.now() - start, foo, one);
-      }, 10, 'foo', 1);
-    });
+  describe('#setTimeout', function () {
+    it('should fire passing arguments', function (done) {
+      var source = fnString(function () {
+        var start = Date.now();
+        setTimeout(function (foo, one) {
+          report(Date.now() - start, foo, one);
+        }, 10, 'foo', 1);
+      });
 
-    var machine = new Machine({
-      report: function (t, foo, one) {
-        assert.equal(foo, 'foo');
-        assert.equal(one, 1);
-        // Not sure if good idea, but we're trying to make sure it's not too
-        // far away from what we expect it to be.
-        assert(t <= 20);
-        done();
-      }
-    });
-
-    machine.on('timer', function () {
-      machine.run();
-    });
-    machine.evaluate(source).run();
-  });
-
-  it('setTimeout should respect order', function (done) {
-    var source = fnString(function () {
-      var start = Date.now();
-      setTimeout(function () {
-        report(3);
-        setTimeout(function () {
-          report(4);
-        }, 0);
-      }, 10);
-      setTimeout(function () {
-        report(1);
-      }, 0);
-      setTimeout(function () {
-        report(2);
-      }, 0);
-    });
-
-    var i = 0;
-    var machine = new Machine({
-      report: function (arg) {
-        assert.equal(arg, ++i);
-        if (i === 4) {
+      var machine = new Machine({
+        report: function (t, foo, one) {
+          assert.equal(foo, 'foo');
+          assert.equal(one, 1);
+          // Not sure if good idea, but we're trying to make sure it's not too
+          // far away from what we expect it to be.
+          assert(t <= 20);
           done();
         }
-      }
+      });
+
+      machine.on('timer', function () {
+        machine.run();
+      });
+      machine.evaluate(source).run();
     });
 
-    machine.on('timer', function () {
-      machine.run();
+    it('should respect order', function (done) {
+      var source = fnString(function () {
+        var start = Date.now();
+        setTimeout(function () {
+          report(3);
+          setTimeout(function () {
+            report(4);
+          }, 0);
+        }, 10);
+        setTimeout(function () {
+          report(1);
+        }, 0);
+        setTimeout(function () {
+          report(2);
+        }, 0);
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+          if (i === 4) {
+            done();
+          }
+        }
+      });
+
+      machine.on('timer', function () {
+        machine.run();
+      });
+      machine.evaluate(source).run();
     });
-    machine.evaluate(source).run();
+
+    // it('should clearTimeout', function () {
+    //   var source = fnString(function () {
+    //     setTimeout(function () {
+    //       report(1);
+    //       clearTimeout(t);
+    //     }, 0);
+    //     var t = setTimeout(function () {
+    //       report('never happens');
+    //     }, 0);
+    //   });
+
+    //   var machine = new Machine({
+    //     report: function (arg) {
+    //       assert.equal(arg, 1);
+    //       done();
+    //     }
+    //   });
+    //   machine.on('timer', function () {
+    //     machine.run();
+    //   });
+    //   machine.evaluate(source).run();
+    // });
   });
 
+  describe('#setInterval', function () {
+    it('setInterval should keep executing', function (done) {
+      var source = fnString(function () {
+        var i = 0;
+        setInterval(function () {
+          report(++i);
+        }, 10);
+      });
+
+      var i = 0;
+      var machine = new Machine({
+        report: function (arg) {
+          assert.equal(arg, ++i);
+          if (i === 4) {
+            done();
+          }
+        }
+      });
+      machine.on('error', console.log)
+      machine.on('timer', function () {
+        machine.run();
+      });
+      machine.evaluate(source).run();
+    });
+  });
 });
