@@ -29,6 +29,7 @@ var EventEmitter = require('events').EventEmitter;
 function Debugger(machine) {
   this.machine = machine;
   machine.on('debugger', this.$machineDebuggerHandler.bind(this));
+  machine.on('timer', this.run.bind(this));
   this.$breakpoints = {};
   EventEmitter.call(this);
 }
