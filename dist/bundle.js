@@ -101,7 +101,7 @@ Debugger.prototype.getCallStack = function (options) {
   options = options || {};
   if (!options.raw) {
     return this.machine.getCallStack().filter(function (frame) {
-      if (frame.type === 'functionCall') {
+      if (frame.type !== 'stackFrame') {
         return false;
       } else {
         return true;
@@ -371,6 +371,7 @@ Runner.prototype.step = function (val) {
   if (this.state.value && this.state.value instanceof Thunk) {
     this.stack.push(this.gen);
     this.gen = this.state.value.invoke();
+    this.gen.type = 'thunk';
     this.step();
   } else if (this.state.value && this.state.value.type === 'stackFrame') {
     this.gen.stackFrame = this.state.value;
@@ -378,7 +379,7 @@ Runner.prototype.step = function (val) {
   } else if (this.state.done) {
     if (isGen(this.state.value)) {
       this.gen = this.state.value;
-      this.state.value.type = 'functionCall';
+      this.gen.type = 'functionCall';
       this.state.done = false;
     } else if (this.stack.length) {
       this.gen = this.stack.pop();
@@ -519,12 +520,12 @@ Machine.prototype.run = function () {
 Machine.prototype.$getStackFrame = function (gen) {
   if (gen.stackFrame) {
     return clone(gen.stackFrame);
-  } else if (gen.type === 'functionCall') {
+  } else if (gen.type === 'functionCall' || gen.type === 'thunk') {
     return {
       type: gen.type
     };
   } else {
-    throw new Error('Unknown call type in stack.');
+    throw new Error('Unknown call type in stack: ' + gen.type);
   }
 };
 
