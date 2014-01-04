@@ -790,3 +790,28 @@ describe('Machine#getCurrentLoc', function () {
     });
   });
 });
+
+describe('timers', function () {
+
+  it('setTimeout should work as expected without breakpoints', function (done) {
+    var source = fnString(function () {
+      var start = Date.now();
+      setTimeout(function () {
+        report(Date.now() - start);
+      }, 10);
+    });
+
+    var machine = new Machine({
+      report: function (t) {
+        console.log(t);
+        done();
+      }
+    });
+    machine.on('error', console.log);
+    machine.on('timer', function () {
+      machine.run();
+    });
+    machine.evaluate(source).run();
+  });
+
+});
