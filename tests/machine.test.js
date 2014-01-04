@@ -465,6 +465,29 @@ describe('Machine#run', function () {
       .run();
   });
 
+  it('should pass the arguments var in thunks', function (done) {
+    var source = fnString(function () {
+      var foo = {
+        p: 1,
+        f: function (a, b, c) {
+          report(arguments);
+        }
+      };
+      foo.f(1, 2, 3);
+    });
+
+    var machine = new Machine({
+      report: function (args) {
+        assert.deepEqual([1, 2, 3], args);
+        done();
+      }
+    });
+
+    machine
+      .evaluate(source)
+      .run();
+  });
+
   it('should handle iterators', function (done) {
     var source = fnString(function () {
       [1, 2, 3].forEach(function (n, i) {
