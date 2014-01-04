@@ -351,7 +351,6 @@ describe('Machine#run', function () {
       .run();
   });
 
-
   it('should run handle multiple calls in expressions', function (done) {
     var source = fnString(function () {
       function foo(x) {
@@ -605,6 +604,38 @@ describe('Machine#getCallStack', function () {
     assert(machine.getCallStack()[0].scope instanceof Array);
   });
 
+  it('should work with nested call expressions vat', function () {
+    var source = fnString(function () {
+      function foo(x) {
+        return 6 / x;
+      }
+      function bar() {
+        return 2;
+      }
+      foo(bar());
+    });
+
+    var machine = new Machine();
+
+    // Makin sure getCallstack doesn't throw on unkown type:
+    machine.evaluate(source)
+    // function foo
+    machine.step();
+    machine.getCallStack();
+    // function bar
+    machine.step();
+    machine.getCallStack();
+    // foo(bar())
+    machine.step();
+    machine.getCallStack();
+    // bar()
+    machine.step();
+    machine.getCallStack();
+    // foo(bar())
+    machine.step();
+    machine.getCallStack();
+  });
+
 });
 
 describe('exceptions', function () {
@@ -656,7 +687,7 @@ describe('exceptions', function () {
     machine.run();
   });
 
-  it('should handle try/catch in called function body wat', function (done) {
+  it('should handle try/catch in called function body', function (done) {
     var source = fnString(function () {
       function foo() {
         watman;
