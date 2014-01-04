@@ -852,28 +852,22 @@ describe('timers', function () {
       machine.evaluate(source).run();
     });
 
-    // it('should clearTimeout', function () {
-    //   var source = fnString(function () {
-    //     setTimeout(function () {
-    //       report(1);
-    //       clearTimeout(t);
-    //     }, 0);
-    //     var t = setTimeout(function () {
-    //       report('never happens');
-    //     }, 0);
-    //   });
+    it('should clearTimeout', function (done) {
+      var source = fnString(function () {
+        setTimeout(function () {
+          clearTimeout(t);
+        }, 0);
+        var t = setTimeout(function () {
+        }, 5);
+      });
 
-    //   var machine = new Machine({
-    //     report: function (arg) {
-    //       assert.equal(arg, 1);
-    //       done();
-    //     }
-    //   });
-    //   machine.on('timer', function () {
-    //     machine.run();
-    //   });
-    //   machine.evaluate(source).run();
-    // });
+      var machine = new Machine();
+      machine.on('timer', function () {
+        machine.run();
+        setTimeout(done.bind(null, null), 5);
+      });
+      machine.evaluate(source).run();
+    });
   });
 
   describe('#setInterval', function () {
@@ -882,7 +876,7 @@ describe('timers', function () {
         var i = 0;
         setInterval(function () {
           report(++i);
-        }, 10);
+        }, 2);
       });
 
       var i = 0;
@@ -900,5 +894,32 @@ describe('timers', function () {
       });
       machine.evaluate(source).run();
     });
+  });
+
+  it('should clearInterval', function (done) {
+    var source = fnString(function () {
+      var i = 0;
+      var t = setInterval(function () {
+        report(++i);
+        if (i === 4) {
+          clearInterval(t);
+        }
+      }, 2);
+    });
+
+    var i = 0;
+    var machine = new Machine({
+      report: function (arg) {
+        assert.equal(arg, ++i);
+        if (i === 4) {
+          i = 0;
+          setTimeout(done.bind(null, null), 5);
+        }
+      }
+    });
+    machine.on('timer', function () {
+      machine.run();
+    });
+    machine.evaluate(source).run();
   });
 });
