@@ -1008,3 +1008,31 @@ describe('timers', function () {
     machine.evaluate(source).run();
   });
 });
+
+describe('events', function () {
+  it('should dispatch async events', function (done) {
+    var source = fnString(function () {
+      testEvent(__wrapListener(function (a, b, c) {
+        report(a, b, c);
+      }));
+    });
+
+    var machine = new Machine({
+      testEvent: function (cb) {
+        setTimeout(function () {
+          assert(machine.halted);
+          cb(1, 2, 3);
+        }, 5);
+      },
+      report: function (a, b, c) {
+        assert(!machine.halted);
+        assert.deepEqual([a, b, c], [1, 2, 3]);
+        done();
+      }
+    });
+    machine.on('event', function () {
+      machine.run();
+    });
+    machine.evaluate(source).run();
+  });
+});
