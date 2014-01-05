@@ -1416,3 +1416,125 @@ describe('functions', function () {
       );
   });
 });
+
+describe('new expressions', function () {
+  it('should ignore transforming natives', function () {
+    var source = parse(
+      fnString(function () {
+        var d = new Date();
+      })
+    );
+    var expected = parse(
+      fnString(function () {
+        function* __top() {
+           yield {
+              "type": "stackFrame",
+              "filename": "testFile",
+              "name": "Global Scope",
+
+              "scope": [{
+                  "name": "d",
+
+                  "locs": [{
+                      "start": {
+                          "line": 1,
+                          "column": 4
+                      },
+
+                      "end": {
+                          "line": 1,
+                          "column": 5
+                      }
+                  }]
+              }],
+
+              "evalInScope": function(expr) {
+                  return eval(expr);
+              }
+          };
+          {
+            yield {
+                "type": "step",
+
+                "start": {
+                    "line": 1,
+                    "column": 0
+                },
+
+                "end": {
+                    "line": 1,
+                    "column": 19
+                }
+            };
+
+            var d = new Date();
+          }
+        }
+      })
+    );
+    assertEqualsAST(
+      transform(source, { filename: 'testFile' }),
+      expected
+    );
+  });
+
+  it('should transform non natives', function () {
+    var source = parse(
+      fnString(function () {
+        var h = new Human(1, 2, 3);
+      })
+    );
+    var expected = parse(
+      fnString(function () {
+        function* __top() {
+           yield {
+              "type": "stackFrame",
+              "filename": "testFile",
+              "name": "Global Scope",
+
+              "scope": [{
+                  "name": "h",
+
+                  "locs": [{
+                      "start": {
+                          "line": 1,
+                          "column": 4
+                      },
+
+                      "end": {
+                          "line": 1,
+                          "column": 5
+                      }
+                  }]
+              }],
+
+              "evalInScope": function(expr) {
+                  return eval(expr);
+              }
+          };
+          {
+            yield {
+                "type": "step",
+
+                "start": {
+                    "line": 1,
+                    "column": 0
+                },
+
+                "end": {
+                    "line": 1,
+                    "column": 27
+                }
+            };
+
+            var h = __instantiate(Human, 1, 2, 3);
+          }
+        }
+      })
+    );
+    assertEqualsAST(
+      transform(source, { filename: 'testFile' }),
+      expected
+    );
+  });
+});

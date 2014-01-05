@@ -1036,3 +1036,29 @@ describe('events', function () {
     machine.evaluate(source).run();
   });
 });
+
+describe('constructors', function () {
+  it('should create an instance of a constructor', function (done) {
+    var source = fnString(function () {
+      function Human(age) {
+        this.age = age;
+      }
+      Human.prototype.dob = function () {
+        return (new Date()).getFullYear() - this.age;
+      };
+      var guy = new Human(18);
+      report(guy instanceof Human);
+      report(guy.age === 18);
+      report(guy.dob() === 1996);
+    });
+
+    var machine = new Machine({
+      report: function (cond) {
+        assert(cond);
+      }
+    });
+    machine.on('error', done);
+    machine.evaluate(source).run();
+    done();
+  });
+});
