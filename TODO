@@ -8,3 +8,6 @@ function and show the last step. Maybe this could be done in the debugger?
 test component build works.
 
 add general event dispatch.
+
+Constructors (new expressions) are hacked in now and can't be stepped through
+think of a better way.
