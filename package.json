@@ -7,7 +7,7 @@
     "test": "mocha --harmony-generators tests/ && mocha tests/machine.test.js"
   },
   "author": "",
-  "license": "BSD-2-Clause",
+  "license": "AAL",
   "dependencies": {
     "recast": "~0.5.6",
     "jsonpretty": "0.0.1",

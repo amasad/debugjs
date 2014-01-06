@@ -6,7 +6,7 @@
   "keywords": [],
   "dependencies": {},
   "development": {},
-  "license": "MIT",
+  "license": "AAL",
   "main": "dist/bundle.js",
   "scripts": [
     "dist/bundle.js"
