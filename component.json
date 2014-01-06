@@ -7,9 +7,8 @@
   "dependencies": {},
   "development": {},
   "license": "MIT",
-  "main": "dist/component-index.js",
+  "main": "dist/bundle.js",
   "scripts": [
-    "dist/component-index.js",
     "dist/bundle.js"
   ]
 }

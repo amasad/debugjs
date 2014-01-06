@@ -1,4 +1,4 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+!function(e){if("object"==typeof exports)module.exports=e();else if("function"==typeof define&&define.amd)define(e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.debugjs=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var Debugger = require('./lib/debugger');
 var Machine = require('./lib/machine');
 
@@ -18,9 +18,6 @@ module.exports = {
   createDebugger: createDebugger
 };
 
-if (typeof window !== 'undefined' && window) {
-  window.debugjs = module.exports;
-}
 
 },{"./lib/debugger":2,"./lib/machine":3}],2:[function(require,module,exports){
 var inherits = require('util').inherits;
@@ -462,6 +459,22 @@ Runner.prototype.$propError = function (e) {
   throw e;
 };
 
+Runner.prototype.instantiate = function (genFn) {
+  var o = Object.create(genFn.prototype);
+  var args = Array.prototype.slice.call(arguments, 1);
+  var gen = genFn.apply(o, args);
+  var val = gen;
+  if (isGen(gen)) {
+    while (!(val = gen.next()).done);
+    val = val.value;
+  }
+  if (val !== undefined) {
+    return val;
+  } else {
+    return o;
+  }
+};
+
 /**
  * @param {*} val
  * @return {boolean}
@@ -501,7 +514,6 @@ Runner.prototype.step = function (val) {
       !this.stack.length
     );
   }
-
   if (this.state.value && this.state.value instanceof Thunk) {
     this.stack.push(this.gen);
     this.gen = this.state.value.invoke();
@@ -538,6 +550,7 @@ function Machine(sandbox, options) {
   sandbox.__runner = this.$runner;
   sandbox.__thunk = createThunk;
   sandbox.__wrapListener = this.$wrapListener.bind(this);
+  sandbox.__instantiate = this.$runner.instantiate.bind(this.$runner);
   sandbox.setTimeout = this.timers.setTimeout.bind(this.timers);
   sandbox.setInterval = this.timers.setInterval.bind(this.timers);
   sandbox.clearTimeout = this.timers.clearTimeout.bind(this.timers);
@@ -588,7 +601,7 @@ Machine.prototype.$bootstrapRuntime = function () {
     .$evaluate(arrayRuntime)
     .run();
 
-  var domRuntime = "(function () {\n\n  if (typeof EventTarget !== 'undefined') {\n    var _on = EventTarget.prototype.addEventListener;\n    EventTarget.prototype.addEventListener =\n    function (type, listener, useCapture, wantsUntrusted) {\n      console.log(this)\n      return _on.call(\n        this,\n        type,\n        __wrapListener(listener),\n        useCapture,\n        wantsUntrusted\n      );\n    };\n  }\n\n})();\n".toString();
+  var domRuntime = "(function () {\n\n  if (typeof EventTarget !== 'undefined') {\n    var _on = EventTarget.prototype.addEventListener;\n    EventTarget.prototype.addEventListener =\n    function (type, listener, useCapture, wantsUntrusted) {\n      return _on.call(\n        this,\n        type,\n        __wrapListener(listener),\n        useCapture,\n        wantsUntrusted\n      );\n    };\n  }\n\n})();\n".toString();
   this
     .$evaluate(domRuntime)
     .run();
@@ -835,6 +848,17 @@ function createStackFrame(path, filename) {
   return ret;
 }
 
+//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
+var NATIVES = ['Array', 'ArrayBuffer', 'Boolean', 'DataView', 'Date', 'Error',
+                'EvalError', 'Float32Array', 'Float64Array', 'Function',
+                'Generator', 'InternalError', 'Int16Array', 'Int32Array',
+                'Int8Array', 'Iterator', 'JSON', 'Map', 'Math', 'NaN', 'Number',
+                'Object', 'ParallelArray', 'Proxy', 'RangeError',
+                'ReferenceError', 'Reflect', 'RegExp', 'Set', 'StopIteration',
+                'String', 'Symbol', 'SyntaxError', 'TypeError', 'Uint16Array',
+                'Uint32Array', 'Uint8Array', 'Uint8ClampedArray', 'URIError',
+                'WeakMap', 'WeakSet'];
+
 function transform(ast, options) {
   recast.types.traverse(ast, function (n) {
     if (n.__stepper) {
@@ -866,6 +890,13 @@ function transform(ast, options) {
         )
       );
       n.generator = true;
+    }
+
+    if (types.NewExpression.check(n)) {
+      if (NATIVES.indexOf(n.callee.name) === -1) {
+        var args = [n.callee].concat(n.arguments);
+        this.replace(b.callExpression(b.identifier('__instantiate'), args));
+      }
     }
 
     if (options.excludeSteps) {
@@ -25250,3 +25281,5 @@ function hasOwnProperty(obj, prop) {
 }
 
 },{"./support/isBuffer":123,"__browserify_process":119,"inherits":118}]},{},[1])
+(1)
+});

@@ -1,6 +1,6 @@
 browserify:
 	@echo browserifying
-	@browserify -t brfs index.js > dist/bundle.js
+	@browserify -s debugjs -t brfs index.js > dist/bundle.js
 
 runtime:
 	@echo building runtime

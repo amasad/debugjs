@@ -17,6 +17,3 @@ module.exports = {
   createDebugger: createDebugger
 };
 
-if (typeof window !== 'undefined' && window) {
-  window.debugjs = module.exports;
-}
