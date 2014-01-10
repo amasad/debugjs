@@ -537,7 +537,8 @@ Runner.prototype.step = function (val) {
 /**
  * @api
  * @constructor
- * @param {object} sandbox An object with things to be copied into the context.
+ * @param {object} sandbox An object with references to be copied into the context.
+ * @param {object} options Optional arguments.
  */
 function Machine(sandbox, options) {
   sandbox = sandbox || {};
@@ -626,7 +627,11 @@ Machine.prototype.$wrapListener = function (genFn) {
   var dispatch = this.$onEvent.bind(this);
   return function () {
     var gen = genFn.apply(this, arguments);
-    dispatch(gen);
+    if (isGen(gen)) {
+      dispatch(gen);
+    } else {
+      return gen;
+    }
   };
 };
 
