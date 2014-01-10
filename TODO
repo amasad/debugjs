@@ -11,3 +11,5 @@ add general event dispatch.
 
 Constructors (new expressions) are hacked in now and can't be stepped through
 think of a better way.
+
+don't wrap pure function event listeners
