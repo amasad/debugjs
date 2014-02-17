@@ -1035,6 +1035,39 @@ describe('events', function () {
     });
     machine.evaluate(source).run();
   });
+
+  it('should queue events', function (done) {
+    var source = fnString(function () {
+      testEvent(__wrapListener(function (a, b, c) {
+        report();
+      }));
+      testEvent(__wrapListener(function (a, b, c) {
+        report();
+      }));
+    });
+
+    var first = true;
+
+    var machine = new Machine({
+      testEvent: function (cb) {
+        setTimeout(function () {
+          // https://twitter.com/amasad/status/435210377387716608
+          assert(!(first ^ machine.halted));
+          cb();
+        }, 5);
+      },
+      report: function (a) {
+        done(new Error('should not get here'));
+      }
+    });
+
+    machine.on('error', done);
+    machine.on('event', function () {
+      assert(first, 'should not trigger the second event without halting');
+      first = false;
+    });
+    machine.evaluate(source).run();
+  });
 });
 
 describe('constructors', function () {
