@@ -898,7 +898,8 @@ describe('timers', function () {
         }
       });
 
-      machine.on('timer', function () {
+      machine.on('event', function (type) {
+        assert.equal(type, 'timer');
         machine.run();
       });
       machine.evaluate(source).run();
@@ -931,7 +932,8 @@ describe('timers', function () {
         }
       });
 
-      machine.on('timer', function () {
+      machine.on('event', function (type) {
+        assert.equal(type, 'timer');
         machine.run();
       });
       machine.evaluate(source).run();
@@ -947,7 +949,8 @@ describe('timers', function () {
       });
 
       var machine = new Machine();
-      machine.on('timer', function () {
+      machine.on('event', function (type) {
+        assert.equal(type, 'timer');
         machine.run();
         setTimeout(done.bind(null, null), 5);
       });
@@ -974,7 +977,8 @@ describe('timers', function () {
         }
       });
       machine.on('error', console.log)
-      machine.on('timer', function () {
+      machine.on('event', function (type) {
+        assert.equal(type, 'timer');
         machine.run();
       });
       machine.evaluate(source).run();
@@ -1002,7 +1006,8 @@ describe('timers', function () {
         }
       }
     });
-    machine.on('timer', function () {
+    machine.on('event', function (type) {
+      assert.equal(type, 'timer');
       machine.run();
     });
     machine.evaluate(source).run();
@@ -1039,10 +1044,10 @@ describe('events', function () {
   it('should queue events', function (done) {
     var source = fnString(function () {
       testEvent(__wrapListener(function (a, b, c) {
-        report();
+        1;
       }));
       testEvent(__wrapListener(function (a, b, c) {
-        report();
+        1;
       }));
     });
 
@@ -1057,15 +1062,20 @@ describe('events', function () {
         }, 5);
       },
       report: function (a) {
-        done(new Error('should not get here'));
       }
     });
 
     machine.on('error', done);
-    machine.on('event', function () {
-      assert(first, 'should not trigger the second event without halting');
+    machine.once('event', function () {
       first = false;
+      machine.once('event', function () {
+        done();
+      });
+      setTimeout(function () {
+        machine.run();
+      }, 5);
     });
+
     machine.evaluate(source).run();
   });
 });
