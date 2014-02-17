@@ -1078,6 +1078,41 @@ describe('events', function () {
 
     machine.evaluate(source).run();
   });
+
+  it('should support Event::stopPropagation', function (done) {
+    var source = fnString(function () {
+      testEvent(__wrapListener(function () {
+        report(-1);
+      }));
+      testEvent(__wrapListener(function () {
+        report(1);
+      }));
+    });
+
+    var first = true;
+
+    var machine = new Machine({
+      testEvent: function (cb) {
+        setTimeout(function () {
+          if (first) {
+            cb({__isPropagationStopped: true});
+          } else {
+            cb();
+          }
+          first = false;
+        }, 5);
+      },
+
+      report: function (v) {
+        assert.equal(1, v);
+        assert(!first);
+        done();
+      }
+    });
+
+    machine.once('event', machine.run.bind(machine));
+    machine.evaluate(source).run();
+  });
 });
 
 describe('constructors', function () {
