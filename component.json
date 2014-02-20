@@ -2,7 +2,7 @@
   "name": "debugjs",
   "repo": "amasad/debugjs",
   "description": "Lightweight JavaScript VM and stepping debugger",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "keywords": [],
   "dependencies": {},
   "development": {},
