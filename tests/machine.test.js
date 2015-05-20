@@ -1122,7 +1122,7 @@ describe('constructors', function () {
         this.age = age;
       }
       Human.prototype.dob = function () {
-        return (new Date()).getFullYear() - this.age;
+        return 2014 - this.age;
       };
       var guy = new Human(18);
       report(guy instanceof Human);
