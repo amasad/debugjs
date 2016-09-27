@@ -478,7 +478,7 @@ describe('Machine#run', function () {
 
     var machine = new Machine({
       report: function (args) {
-        assert.deepEqual([1, 2, 3], args);
+        assert.deepEqual([1, 2, 3], Array.prototype.slice.call(args));
         done();
       }
     });

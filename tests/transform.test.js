@@ -18,6 +18,7 @@ function assertMsgFn(condition, msgFn) {
 
 function assertEqualNodes(actual, expected) {
   for (var prop in actual) {
+    if (prop === 'async') continue;
     if (typeof actual[prop] !== 'object') {
       assertMsgFn(
         expected,
