@@ -2,12 +2,12 @@
 // dereference that costs universally.
 // _Please note: Shortcuts are defined after `Function.prototype.bind` as we
 // us it in defining shortcuts.
-wrapGenerator.mark(__top__);
+wrapGenerator.mark(__top);
 
-function __top__() {
+function __top() {
     var call, prototypeOfObject, _toString, toObject, boxedString, splitString;
 
-    return wrapGenerator(function __top__$($ctx1) {
+    return wrapGenerator(function __top$($ctx1) {
         while (1) switch ($ctx1.next) {
         case 0:
             $ctx1.next = 2;
