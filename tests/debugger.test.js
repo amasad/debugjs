@@ -166,6 +166,7 @@ describe('Debugger#run', function () {
     machine.evaluate(fooFile, 'fooFile');
     debuggr.addBreakpoints('barFile', [2]);
     var stopped = debuggr.run();
+    console.log('debuggr.breakpointData', debuggr.breakpointData);
     var data = JSON.parse(JSON.stringify(debuggr.breakpointData));
     assert.deepEqual(data, {
       filename: 'barFile',
