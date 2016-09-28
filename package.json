@@ -10,6 +10,7 @@
     "clean:umd": "rimraf dist/umd",
     "clean:es": "rimraf dist/es",
     "lint": "eslint lib tests",
+    "prepublish": "npm run build",
     "test": "cross-env BABEL_DISABLE_CACHE=1 mocha --compilers js:babel-register tests"
   },
   "author": "",
