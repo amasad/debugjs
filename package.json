@@ -2,9 +2,16 @@
   "name": "debugjs",
   "version": "0.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "dist/es/index.js",
   "scripts": {
-    "test": "mocha tests"
+    "build:es": "npm run clean:es && cross-env BABEL_DISABLE_CACHE=1 cross-env NODE_ENV=production babel lib --out-dir dist/es",
+    "build:umd": "npm run clean:umd && cross-env BABEL_DISABLE_CACHE=1 cross-env NODE_ENV=production webpack --config webpack.config.umd.babel.js -p --bail",
+    "build": "npm run build:umd && npm run build:es",
+    "clean:umd": "rimraf dist/umd",
+    "clean:es": "rimraf dist/es",
+    "lint": "eslint lib tests",
+    "prepublish": "npm run build",
+    "test": "cross-env BABEL_DISABLE_CACHE=1 mocha --compilers js:babel-register tests"
   },
   "author": "",
   "license": "AAL",
@@ -18,7 +25,26 @@
     "commander": "~2.1.0"
   },
   "devDependencies": {
+    "babel-cli": "^6.14.0",
+    "babel-core": "^6.14.0",
+    "babel-eslint": "^7.0.0",
+    "babel-loader": "^6.2.5",
+    "babel-plugin-transform-class-properties": "^6.11.5",
+    "babel-plugin-transform-object-rest-spread": "^6.8.0",
+    "babel-plugin-transform-regenerator": "^6.14.0",
+    "babel-plugin-transform-runtime": "^6.15.0",
+    "babel-plugin-webpack-loaders": "^0.7.1",
+    "babel-preset-latest": "^6.14.0",
+    "cross-env": "^3.0.0",
+    "eslint": "^3.6.1",
+    "eslint-config-airbnb": "^12.0.0",
+    "eslint-plugin-import": "^1.16.0",
+    "eslint-plugin-jsx-a11y": "^2.2.2",
+    "eslint-plugin-react": "^6.3.0",
     "esprima": "git://github.com/ariya/esprima.git#harmony",
-    "mocha": "^3.1.0"
+    "mocha": "^3.1.0",
+    "raw-loader": "^0.5.1",
+    "rimraf": "^2.5.4",
+    "webpack": "^1.13.2"
   }
 }
