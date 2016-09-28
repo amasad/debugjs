@@ -1,0 +1,10 @@
+{
+  "presets": ["latest"],
+  "plugins": [
+    ["babel-plugin-webpack-loaders", { "config": "./webpack.config.loaders.babel.js", "verbose": false }],
+    "transform-class-properties",
+    "transform-object-rest-spread",
+    ["babel-plugin-transform-regenerator", { "async": false }],
+    ["transform-runtime", { "helpers": false, "polyfill": false, "regenerator": true }]
+  ]
+}
